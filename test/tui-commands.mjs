@@ -149,6 +149,54 @@ app.overlayEvent({ type: "key", name: "down" });
 app.overlayEvent({ type: "key", name: "enter" });
 check("overlay pick returns value", (await p) === 2);
 
+// ── /goal: completes when the model says GOAL_COMPLETE ──
+{
+  const realTurn = app.turn.bind(app);
+  let turns = 0;
+  app.turn = async (line, display) => {
+    turns++;
+    app.history.push({ role: "user", content: line });
+    app.history.push({ role: "assistant", content: turns >= 2 ? "all verified. GOAL_COMPLETE" : "step 1 done, continuing" });
+  };
+  await app.command("/goal smoketest: tiny goal");
+  check("goal runs first iteration", turns === 1 && app.goal && app.goal.iter === 1);
+  check("goal schedules next iteration", app.goal.resumeAt > 0);
+  app.goal.resumeAt = 1; // make it due
+  app.tickAutomations();
+  await new Promise((r) => setTimeout(r, 30));
+  check("goal completes on GOAL_COMPLETE", app.goal === null && turns === 2);
+
+  // paused when a turn produces nothing (e.g. user pressed Esc)
+  app.turn = async () => {};
+  await app.command("/goal smoketest: doomed goal");
+  check("goal pauses on empty turn", app.goal !== null && app.goal.resumeAt === 0);
+  await app.command("/goal clear");
+  check("goal clear works", app.goal === null);
+  app.turn = realTurn;
+}
+
+// ── /loop: arm, tick, stop ──
+{
+  const realTurn = app.turn.bind(app);
+  let runs = 0;
+  app.turn = async () => { runs++; };
+  await app.command("/loop 5m say hi");
+  check("loop armed with interval", app.autoLoop?.intervalMs === 300000);
+  app.tickAutomations();
+  await new Promise((r) => setTimeout(r, 30));
+  check("loop first run fired", runs === 1);
+  check("loop re-armed ~5m out", app.autoLoop.nextAt - Date.now() > 290000);
+  await app.command("/loop status");
+  check("loop status ok", true);
+  await app.command("/loop stop");
+  check("loop stop clears", app.autoLoop === null);
+  await app.command("/loop 10s too fast");
+  check("loop rejects <30s interval", app.autoLoop === null);
+  await app.command("/loop 5m /loop nope");
+  check("loop refuses recursion", app.autoLoop === null);
+  app.turn = realTurn;
+}
+
 clearInterval(app.timer);
 try { fs.rmSync(process.env.AION_HOME, { recursive: true, force: true }); } catch {}
 console.log(failed ? `\n${failed} FAILED` : "\nall tui command tests passed");

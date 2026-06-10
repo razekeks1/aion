@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.5.0
+- `/goal <mission>` — autonomous goal mode: Aion iterates with tools until it verifies completion (safety limit, `resume`, `clear`, `max <n>`)
+- `/loop [interval] <prompt>` — recurring prompts; without an interval Aion self-paces the next run; status-bar countdown, `/loop stop`
+
 ## 3.4.0
 - Animated SVG terminal demo in the README (renders natively on GitHub)
 - Per-answer token stats: the meta line shows tokens + tok/s (Ollama & OpenAI-compatible streams)

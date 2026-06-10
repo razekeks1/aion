@@ -11,7 +11,7 @@ const { resilientChat, routeModel, councilSeats } = await import("../src/agent.m
 const { Memory, detectFeedback, similarity } = await import("../src/memory.mjs");
 const { wrapAnsi, padTrunc, visLen, stripAnsi } = await import("../src/tui.mjs");
 const { newSessionId, saveSession, loadSession, exportMarkdown, sessionPath } = await import("../src/sessions.mjs");
-const { cpPrev, cpNext } = await import("../src/repl.mjs");
+const { cpPrev, cpNext, parseInterval } = await import("../src/repl.mjs");
 const { renderMarkdown } = await import("../src/ui.mjs");
 const { loadConfig } = await import("../src/config.mjs");
 const { toolDefinitions } = await import("../src/tools.mjs");
@@ -134,6 +134,12 @@ check("similarity low for unrelated", similarity("Pizza Rezept", "Quantenphysik 
   check("cpPrev clamps at 0", cpPrev(t, 0) === 0);
   check("cpNext clamps at end", cpNext(t, t.length) === t.length);
 }
+
+// ── /loop interval parsing ──
+check("parseInterval 5m", parseInterval("5m") === 300000);
+check("parseInterval 90s", parseInterval("90s") === 90000);
+check("parseInterval 2h", parseInterval("2h") === 7200000);
+check("parseInterval rejects words", parseInterval("hello") === null && parseInterval("") === null);
 
 // ── markdown renderer ──
 {

@@ -9,7 +9,7 @@
 [![license MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078d4)](#)
 [![CI](https://img.shields.io/badge/CI-3%20OS%20%C3%97%203%20node-brightgreen?logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
-[![tests](https://img.shields.io/badge/tests-79%20passing-brightgreen)](test/)
+[![tests](https://img.shields.io/badge/tests-95%20passing-brightgreen)](test/)
 
 *Hermes delivers messages. OpenClaw follows orders.*
 ***Aion is eternity itself — the agent that doesn't just grow with you, it evolves.***
@@ -69,6 +69,14 @@ Model overloaded? Rate-limited? Network blip? Aion retries with backoff, then **
 
 ### 🧠 Neural Router
 Simple turns route to your fast/local model, hard ones to the flagship — automatically, by analyzing the prompt. Faster *and* cheaper, toggle with `/router`.
+
+### 🎯 Goal mode & loops
+`/goal <mission>` puts Aion into autonomous mode: it works toward the goal in iterations — using tools, verifying its own results — and only stops when it confirms completion (or hits the 15-iteration safety limit; `Esc` interrupts, `/goal resume` continues, `/goal clear` stops). `/loop 10m <prompt>` re-runs a prompt on a schedule; `/loop <prompt>` without an interval is **self-paced** — Aion decides when the next run makes sense. A live countdown sits in the status bar.
+
+```text
+❯ /goal refactor utils.py, run the tests, fix everything until green
+🎯 goal set — working autonomously, max 15 iterations
+```
 
 ### ↻ Sessions that survive
 Every conversation auto-saves. `aion --continue` resumes exactly where you left off, `/sessions` opens a picker to jump back into any past conversation — even one-shot `aion -p` calls are resumable. `/export` writes the chat as clean Markdown.
@@ -138,6 +146,8 @@ Aion writes, saves and reuses its own skills as it works. Successful multi-tool 
 ✔ Gemerkt.
 
 ❯ /council should I shard this database now or later?
+❯ /goal clean up my Downloads folder, sorted by file type
+❯ /loop 30m check hacker news for posts about terminal agents
 ❯ /facts            # what Aion knows about you
 ❯ /genome           # its evolved rules + confidence
 ❯ /dream            # consolidate memory right now
@@ -173,7 +183,7 @@ Everything is local. Nothing leaves your machine except the LLM calls you config
 ## Development
 
 ```cmd
-npm test        # 79 smoke + TUI-hardening tests, sandboxed (never touches your ~/.aion)
+npm test        # 95 smoke + TUI-hardening tests, sandboxed (never touches your ~/.aion)
                 # CI runs them on Windows, Ubuntu and macOS × node 18/20/22
 ```
 

@@ -8,7 +8,7 @@ import { Memory, detectFeedback } from "./memory.mjs";
 import { loadSkills, dueReminders } from "./tools.mjs";
 import { saveConfig } from "./config.mjs";
 import { runSetup, collectModels } from "./setup.mjs";
-import { PROVIDERS } from "./providers.mjs";
+import { PROVIDERS, quickChat } from "./providers.mjs";
 import { newSessionId, saveSession, exportMarkdown, listSessions } from "./sessions.mjs";
 import path from "node:path";
 import fs from "node:fs";
@@ -45,6 +45,8 @@ const TIPS = [
 
 const PALETTE = [
   ["council", "multi-model deliberation on a question", true],
+  ["goal", "autonomous mode — work in a loop until the goal is done", true],
+  ["loop", "repeat a prompt on an interval (or self-paced)", true],
   ["export", "save conversation as Markdown", false],
   ["sessions", "browse & resume past conversations", false],
   ["genome", "show evolved rules with confidence", false],
@@ -71,6 +73,19 @@ const fmtDur = (ms) => (ms < 1000 ? `${Math.max(0, Math.round(ms))}ms` : `${(ms 
 // code-point-aware cursor steps so emoji/astral chars never split surrogate pairs
 export const cpPrev = (t, i) => (i >= 2 && (t.codePointAt(i - 2) ?? 0) >= 0x10000 ? i - 2 : Math.max(0, i - 1));
 export const cpNext = (t, i) => (i < t.length && (t.codePointAt(i) ?? 0) >= 0x10000 ? i + 2 : Math.min(t.length, i + 1));
+
+// "5m" → 300000ms · supports s/m/h/d · null if not an interval token
+export function parseInterval(tok) {
+  const m = /^(\d+)([smhd])$/.exec(tok || "");
+  if (!m) return null;
+  return +m[1] * { s: 1000, m: 60000, h: 3600000, d: 86400000 }[m[2]];
+}
+
+const fmtMs = (ms) => {
+  if (ms < 60000) return `${Math.max(1, Math.round(ms / 1000))}s`;
+  if (ms < 3600000) return `${Math.round(ms / 60000)}m`;
+  return `${(ms / 3600000).toFixed(ms % 3600000 ? 1 : 0)}h`;
+};
 
 export async function runRepl(cfg, version, resume = null) {
   if (!process.stdout.isTTY || !process.stdin.isTTY) {
@@ -104,6 +119,8 @@ export class App {
     this._modelZone = null;         // {y, x1, x2}
     this._lastModel = null;
     this._tip = TIPS[Math.floor(Math.random() * TIPS.length)];
+    this.goal = null;       // {text, iter, max, resumeAt}
+    this.autoLoop = null;   // {prompt, intervalMs|null (self-paced), runs, nextAt}
     this.sessionId = resume?.id || newSessionId();
     if (resume?.history?.length) {
       this.history = resume.history.slice(-40);
@@ -132,10 +149,91 @@ export class App {
 
     this.timer = setInterval(() => {
       if (this.dirty || this.busy) { this.render(); this.dirty = false; }
+      this.tickAutomations();
     }, 33);
     this.render();
     if (this.cfg.tourPending) this.runTour();
     return new Promise(() => {});
+  }
+
+  // ── /goal & /loop engine ───────────────────────────────
+  // Fires pending goal iterations and due loop runs whenever the app is idle.
+  tickAutomations() {
+    if (this.busy || this.overlay || this.capture || this.quitting) return;
+    if (this.goal?.resumeAt && Date.now() >= this.goal.resumeAt) {
+      this.goal.resumeAt = 0;
+      this.goalStep();
+      return;
+    }
+    if (this.autoLoop && Date.now() >= this.autoLoop.nextAt) {
+      this.autoLoop.nextAt = Infinity; // re-armed by loopStep when the run ends
+      this.loopStep();
+    } else if (this.autoLoop && this.autoLoop.nextAt !== Infinity) {
+      // keep the countdown in the status bar ticking
+      const left = this.autoLoop.nextAt - Date.now();
+      if (Math.floor(left / 1000) !== this.autoLoop._lastLeft) {
+        this.autoLoop._lastLeft = Math.floor(left / 1000);
+        this.dirty = true;
+      }
+    }
+  }
+
+  async goalStep() {
+    const G = this.goal;
+    if (!G) return;
+    G.iter++;
+    const directive = G.iter === 1
+      ? `GOAL MODE — work autonomously toward this goal:\n${G.text}\n\nUse your tools, make decisions yourself, verify your own work. End your answer with a short status. When — and only when — the goal is fully achieved AND verified, include the literal token GOAL_COMPLETE.`
+      : `GOAL MODE iteration ${G.iter}/${G.max} — the goal: ${G.text}\nContinue from where you left off. Verify results with tools. Include GOAL_COMPLETE only when fully done; otherwise state your next concrete step.`;
+    const before = this.history.length;
+    await this.turn(directive, `🎯 goal ${G.iter}/${G.max} — ${G.text.slice(0, 70)}`);
+    if (!this.goal) return; // cleared meanwhile
+    if (this.history.length === before) {
+      this.add("sys", warn("🎯 goal paused — the turn was interrupted or produced nothing. ") + dim("/goal resume to retry · /goal clear to drop"));
+      G.resumeAt = 0;
+      return;
+    }
+    const lastA = [...this.history].reverse().find((m) => m.role === "assistant");
+    if (/GOAL_COMPLETE/.test(String(lastA?.content || ""))) {
+      this.add("sys", ok(`🎯 goal complete after ${G.iter} iteration${G.iter > 1 ? "s" : ""}`));
+      this.goal = null;
+    } else if (G.iter >= G.max) {
+      this.add("sys", warn(`🎯 stopped at the ${G.max}-iteration safety limit`) + dim(" — /goal resume continues, /goal clear drops it"));
+      G.resumeAt = 0;
+    } else {
+      G.resumeAt = Date.now() + 1500;
+      this.add("sys", dim(`🎯 not done yet — iteration ${G.iter + 1} starts in a moment (Esc + /goal clear to stop)`));
+    }
+    this.dirty = true;
+  }
+
+  async loopStep() {
+    const L = this.autoLoop;
+    if (!L) return;
+    L.runs++;
+    this.add("sys", violet("⟳ ") + dim(`loop run #${L.runs} — `) + L.prompt.slice(0, 70));
+    if (L.prompt.startsWith("/")) await this.command(L.prompt);
+    else await this.turn(L.prompt);
+    if (!this.autoLoop) return; // stopped meanwhile
+    let delay = L.intervalMs;
+    if (!delay) {
+      // self-paced: a quick model call picks the next sensible delay
+      delay = 600000;
+      try {
+        const lastA = [...this.history].reverse().find((m) => m.role === "assistant");
+        const m = this.cfg.fastModel?.id ? this.cfg.fastModel : this.cfg.model;
+        const out = await quickChat(this.cfg, {
+          provider: m.provider, model: m.id,
+          system: "Reply with ONLY a number of seconds between 60 and 3600. Nothing else.",
+          prompt: `A recurring task runs in a loop: "${L.prompt}". Latest result: ${String(lastA?.content || "(none)").slice(0, 300)}\nHow many seconds until the next run makes sense?`,
+        });
+        const n = parseInt(out.match(/\d+/)?.[0], 10);
+        if (n >= 60 && n <= 3600) delay = n * 1000;
+      } catch {}
+      this.add("sys", dim(`⟳ self-paced — next run in ${fmtMs(delay)}`));
+    }
+    L.nextAt = Date.now() + delay;
+    this.dirty = true;
   }
 
   // first-launch feature tour — short, animated, skippable by just typing
@@ -405,7 +503,7 @@ export class App {
   }
 
   // ── chat turn ──────────────────────────────────────────
-  async turn(line) {
+  async turn(line, display = null) {
     // implicit feedback about the previous answer feeds the Evolution Engine
     const fb = detectFeedback(line);
     if (fb && this.history.length >= 2) {
@@ -413,7 +511,7 @@ export class App {
       this.memory.recordFeedback(fb, `assistant: ${String(lastA.content).slice(0, 140)} | user: ${line.slice(0, 90)}`);
     }
 
-    this.add("user", line);
+    this.add("user", display || line);
     this.busy = true;
     this.status = "thinking";
     this.abort = new AbortController();
@@ -579,6 +677,7 @@ export class App {
         sys(renderMarkdown([
           "**Chat** — type & ↵ · `Esc` stop generation · `Ctrl+C` clear input / quit · `Ctrl+P` command palette",
           "**Council** — `/council <question>` — parallel multi-model deliberation (no arg = redo last prompt)",
+          "**Autonomy** — `/goal <mission>` works in a loop until verified done · `/loop [10m] <prompt>` repeats it",
           "**Evolution** — Aion learns from your reactions; `/genome` shows rules + confidence · `/genome pin <n>`",
           "**Sessions** — auto-saved · `/sessions` browse & resume · `aion --continue` · `/export` → Markdown",
           "**Scroll** — mouse wheel · `PgUp`/`PgDn` · `Esc` jump to bottom",
@@ -595,6 +694,64 @@ export class App {
         if (!q) { sys(dim("usage: /council <question> — parallel multi-model deliberation (no arg = last prompt)")); break; }
         if (!arg) sys(dim("🏛 re-deliberating: ") + String(q).slice(0, 80));
         await this.councilTurn(String(q));
+        break;
+      }
+
+      case "goal": {
+        if (!arg) {
+          sys(this.goal
+            ? `${violet("🎯")} ${this.goal.text}\n` + dim(`   iteration ${this.goal.iter}/${this.goal.max} · /goal clear to stop · /goal resume to continue a paused goal`)
+            : dim("usage: /goal <mission> — Aion works autonomously in a loop until it verifies the goal is done\n       /goal clear · /goal resume · /goal max <n>"));
+          break;
+        }
+        if (arg === "clear") {
+          sys(this.goal ? `${ok("✔")} goal cleared` : dim("no active goal"));
+          this.goal = null;
+          break;
+        }
+        if (arg === "resume") {
+          if (!this.goal) { sys(dim("no goal to resume")); break; }
+          if (this.goal.iter >= this.goal.max) this.goal.max += 10;
+          sys(dim("🎯 resuming…"));
+          await this.goalStep();
+          break;
+        }
+        const maxM = arg.match(/^max\s+(\d+)$/);
+        if (maxM) {
+          if (!this.goal) { sys(dim("no active goal")); break; }
+          this.goal.max = Math.max(this.goal.iter, parseInt(maxM[1], 10));
+          sys(`${ok("✔")} iteration limit → ${this.goal.max}`);
+          break;
+        }
+        this.goal = { text: arg, iter: 0, max: 15, resumeAt: 0 };
+        sys(`${violet("🎯 goal set")} ${dim("— working autonomously, max 15 iterations · Esc interrupts · /goal clear stops")}`);
+        await this.goalStep();
+        break;
+      }
+
+      case "loop": {
+        if (!arg || arg === "status") {
+          sys(this.autoLoop
+            ? `${violet("⟳")} "${this.autoLoop.prompt.slice(0, 60)}" · ${this.autoLoop.runs} runs · ` +
+              (this.autoLoop.intervalMs ? `every ${fmtMs(this.autoLoop.intervalMs)}` : "self-paced") +
+              (this.autoLoop.nextAt !== Infinity ? dim(` · next in ${fmtMs(Math.max(0, this.autoLoop.nextAt - Date.now()))}`) : dim(" · running")) +
+              dim(" · /loop stop")
+            : dim("usage: /loop <interval> <prompt> — repeat a prompt (e.g. /loop 10m check my reminders)\n       /loop <prompt> — self-paced: Aion picks the next run time itself\n       /loop stop · /loop status"));
+          break;
+        }
+        if (arg === "stop") {
+          sys(this.autoLoop ? `${ok("✔")} loop stopped after ${this.autoLoop.runs} runs` : dim("no active loop"));
+          this.autoLoop = null;
+          break;
+        }
+        const [tok, ...restP] = arg.split(/\s+/);
+        const iv = parseInterval(tok);
+        const prompt = iv ? restP.join(" ") : arg;
+        if (!prompt) { sys(dim("usage: /loop [interval] <prompt>")); break; }
+        if (/^\/(loop|goal)\b/.test(prompt)) { sys(err("✖ /loop can't recurse into /loop or /goal")); break; }
+        if (iv && iv < 30000) { sys(err("✖ minimum interval is 30s")); break; }
+        this.autoLoop = { prompt, intervalMs: iv, runs: 0, nextAt: Date.now() };
+        sys(`${violet("⟳ loop armed")} ${dim(`— ${iv ? "every " + fmtMs(iv) : "self-paced"} · first run starts now · /loop stop to cancel`)}`);
         break;
       }
 
@@ -1013,6 +1170,10 @@ export class App {
     } else {
       const cwd = process.cwd().replace(os.homedir(), "~");
       left = " " + dim(cwd);
+      if (this.goal) left += "  " + violet("🎯") + dim(` ${this.goal.iter}/${this.goal.max}`);
+      if (this.autoLoop && this.autoLoop.nextAt !== Infinity) {
+        left += "  " + violet("⟳") + dim(` ${fmtMs(Math.max(0, this.autoLoop.nextAt - Date.now()))}`);
+      }
       right = bold("ctrl+p") + dim(" commands") + "  " + dim(stats + " · v" + this.version) + " ";
     }
     if (this.scroll > 0) right = dim(`↑${this.scroll} `) + right;

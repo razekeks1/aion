@@ -14,7 +14,7 @@
 *Hermes delivers messages. OpenClaw follows orders.*
 ***Aion is eternity itself — the agent that doesn't just grow with you, it evolves.***
 
-`📸 [GIF placeholder: fullscreen TUI — streaming markdown answer with thought timer]`
+<img src="assets/demo.svg" alt="AION demo — council mode deliberating in the terminal" width="760">
 
 </div>
 
@@ -60,8 +60,6 @@ Pin a rule (`/genome pin 1`) and it becomes immortal — it survives dreams *and
   { "role": "Engineer", "style": "think in tradeoffs", "model": "anthropic:claude-sonnet-4-6" }
 ]}
 ```
-
-`📸 [GIF placeholder: /council — three seats answering in parallel, chairperson synthesis streaming]`
 
 ### 💤 Triadic Memory + Dream Cycle
 Three memory systems, like a brain: **episodic** (what happened), **semantic** (what is true), **procedural** (how to do things). On exit — or with `/dream` — Aion consolidates: episodes compress into durable facts, duplicates merge, stale memories decay and prune. Recall is hybrid trigram-cosine + keyword scoring: offline, multilingual, instant, no embedding model needed.
@@ -124,13 +122,12 @@ Aion writes, saves and reuses its own skills as it works. Successful multi-tool 
 
 ## The TUI
 
-`📸 [GIF placeholder: command palette (Ctrl+P) and model picker]`
-
 - **Streaming markdown** — answers render formatted *while* they stream, with live thought timers
 - **Mouse-native** — wheel scrolls, click the model name to switch brains, click to place the cursor
 - **Resize-proof** — the whole frame re-renders from state; emoji-safe input editing
 - **Clickable links** — URLs are real hyperlinks (Ctrl+click in Windows Terminal)
 - **Multiline input** — `Ctrl+J` or trailing `\` + `↵` for newlines; pasted blocks keep their line breaks
+- **Per-answer stats** — every reply shows model, latency, tokens and tok/s in a subtle meta line
 - Keys: `↵` send · `↑↓` history/lines · `Ctrl+P` palette · `PgUp/PgDn` scroll · `Esc` interrupt · `Ctrl+L` clear
 
 ## Daily use

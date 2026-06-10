@@ -1,6 +1,6 @@
 {
   "name": "aion-agent",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "description": "AION — The eternal agent. Triadic memory, dream cycles, neural routing, multi-model council, self-evolving genome. Zero dependencies.",
   "type": "module",
   "bin": {
@@ -9,6 +9,7 @@
   "files": [
     "bin",
     "src",
+    "assets",
     "README.md",
     "LICENSE"
   ],

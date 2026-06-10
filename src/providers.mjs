@@ -157,6 +157,7 @@ async function chatOllama(cfg, { model, messages, tools, onToken, onThinking, si
 
   let content = "";
   const toolCalls = [];
+  let usage = null;
   let buf = "";
   const decoder = new TextDecoder();
   for await (const chunk of res.body) {
@@ -169,6 +170,13 @@ async function chatOllama(cfg, { model, messages, tools, onToken, onThinking, si
       let obj;
       try { obj = JSON.parse(line); } catch { continue; }
       if (obj.error) throw new Error(`Ollama: ${obj.error}`);
+      if (obj.done && obj.eval_count) {
+        usage = {
+          in: obj.prompt_eval_count || 0,
+          out: obj.eval_count || 0,
+          tps: obj.eval_duration ? Math.round(obj.eval_count / (obj.eval_duration / 1e9)) : 0,
+        };
+      }
       const msg = obj.message || {};
       if (msg.thinking) onThinking?.(msg.thinking);
       if (msg.content) { content += msg.content; onToken?.(msg.content); }
@@ -183,7 +191,7 @@ async function chatOllama(cfg, { model, messages, tools, onToken, onThinking, si
       }
     }
   }
-  return { content, toolCalls };
+  return { content, toolCalls, usage };
 }
 
 async function chatOpenAI(cfg, def, providerName, { model, messages, tools, onToken, onThinking, signal }) {
@@ -205,6 +213,7 @@ async function chatOpenAI(cfg, def, providerName, { model, messages, tools, onTo
   if (!res.ok) throw new Error(`${providerName} ${res.status}: ${(await res.text()).slice(0, 300)}`);
 
   let content = "";
+  let usage = null;
   const tcParts = new Map(); // index → {id, name, args}
   let buf = "";
   const decoder = new TextDecoder();
@@ -219,6 +228,9 @@ async function chatOpenAI(cfg, def, providerName, { model, messages, tools, onTo
       if (payload === "[DONE]") continue;
       let obj;
       try { obj = JSON.parse(payload); } catch { continue; }
+      if (obj.usage?.completion_tokens) {
+        usage = { in: obj.usage.prompt_tokens || 0, out: obj.usage.completion_tokens, tps: 0 };
+      }
       const delta = obj.choices?.[0]?.delta;
       if (!delta) continue;
       if (delta.reasoning_content || delta.reasoning) onThinking?.(delta.reasoning_content || delta.reasoning);
@@ -240,7 +252,7 @@ async function chatOpenAI(cfg, def, providerName, { model, messages, tools, onTo
     try { args = JSON.parse(p.args || "{}"); } catch {}
     return { id: p.id, name: p.name, arguments: args };
   });
-  return { content, toolCalls };
+  return { content, toolCalls, usage };
 }
 
 // internal messages → Ollama wire format (tool calls/results must be re-shaped)

@@ -132,6 +132,7 @@ export async function runTurn(cfg, memory, history, userText, onEvent, signal) {
   ];
   const tools = toolDefinitions();
   let finalContent = "";
+  const usage = { in: 0, out: 0, tps: 0 };
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const res = await resilientChat(cfg, model, {
@@ -142,6 +143,10 @@ export async function runTurn(cfg, memory, history, userText, onEvent, signal) {
       onThinking: (tok) => onEvent?.({ type: "thinking", token: tok }),
     }, onEvent);
     model = { ...res.model, tier: model.tier }; // stick with whatever model worked
+    if (res.usage) {
+      usage.in += res.usage.in; usage.out += res.usage.out;
+      if (res.usage.tps) usage.tps = res.usage.tps; // rate of the final round
+    }
     const { content, toolCalls } = res;
 
     if (!toolCalls?.length) {
@@ -162,7 +167,7 @@ export async function runTurn(cfg, memory, history, userText, onEvent, signal) {
     }
   }
 
-  return { content: finalContent, model };
+  return { content: finalContent, model, usage: usage.out ? usage : null };
 }
 
 // ── Council: parallel multi-model deliberation ───────────

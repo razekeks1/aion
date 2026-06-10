@@ -425,7 +425,7 @@ export class App {
     const toolTrace = [];
 
     try {
-      const { content, model } = await runTurn(this.cfg, this.memory, this.history, line, (ev) => {
+      const { content, model, usage } = await runTurn(this.cfg, this.memory, this.history, line, (ev) => {
         if (ev.type === "route") {
           this._lastModel = ev.model;
           if (ev.model.tier === "fast") this.status = "thinking " + dim("(fast lane)");
@@ -473,7 +473,8 @@ export class App {
         sm.text = renderMarkdown(content);
         sm.done = true;
         const modelId = model?.id || this._lastModel?.id || this.cfg.model.id;
-        this.add("meta", dim(`◆ ${modelId} · ${fmtDur(Date.now() - t0)}`));
+        const tok = usage ? ` · ${usage.out} tok${usage.tps ? ` · ${usage.tps} tok/s` : ""}` : "";
+        this.add("meta", dim(`◆ ${modelId} · ${fmtDur(Date.now() - t0)}${tok}`));
         this.history.push({ role: "user", content: line });
         this.history.push({ role: "assistant", content });
         if (this.history.length > 40) this.history.splice(0, this.history.length - 30);

@@ -88,9 +88,22 @@ try {
   check("ctrl-u clears", app.input.text === "");
 } catch (e) { check("input edge cases crashed: " + e.message, false); }
 
-// paste with newlines + huge line
+// multiline: paste keeps newlines, ctrl-j inserts them, ↑↓ navigate lines
 app.onEvent({ type: "paste", text: "line1\nline2\nline3" });
-check("paste flattens newlines", !app.input.text.includes("\n"));
+check("paste keeps newlines", app.input.text.split("\n").length === 3);
+check("buildInput multi-row", app.buildInput(60).rows.length === 3);
+app.onEvent({ type: "key", name: "up" });
+check("up moves a line, not history", app.input.text.includes("line1") && app.input.cur < app.input.text.length);
+app.onEvent({ type: "key", name: "home" });
+check("home goes to line start", app.input.text[app.input.cur - 1] === "\n" || app.input.cur === 0);
+app.input.text = ""; app.input.cur = 0;
+app.onEvent({ type: "char", ch: "a" });
+app.onEvent({ type: "key", name: "ctrl-j" });
+app.onEvent({ type: "char", ch: "b" });
+check("ctrl-j inserts newline", app.input.text === "a\nb");
+app.input.text = "x\\"; app.input.cur = 2;
+app.onEvent({ type: "key", name: "enter" });
+check("backslash+enter continues line", app.input.text === "x\n");
 app.input.text = ""; app.input.cur = 0;
 app.onEvent({ type: "paste", text: "y".repeat(5000) });
 check("huge paste survives", app.input.text.length === 5000);

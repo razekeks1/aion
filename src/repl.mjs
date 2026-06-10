@@ -190,7 +190,7 @@ export class App {
     if (this.overlay) return this.overlayEvent(ev);
 
     if (ev.type === "char") return this.insert(ev.ch);
-    if (ev.type === "paste") return this.insert(ev.text.replace(/\n+/g, " "));
+    if (ev.type === "paste") return this.insert(ev.text); // multiline paste stays multiline
 
     if (ev.type === "mouse") {
       if (ev.kind === "wheel-up") { this.scroll += 3; this.dirty = true; return; }
@@ -202,7 +202,13 @@ export class App {
     if (ev.type !== "key") return;
     const I = this.input;
     switch (ev.name) {
-      case "enter": return this.submit();
+      case "enter":
+        // trailing backslash continues on the next line (claude-code idiom)
+        if (I.text.endsWith("\\") && I.cur === I.text.length) {
+          I.text = I.text.slice(0, -1) + "\n"; I.cur = I.text.length; this.dirty = true; return;
+        }
+        return this.submit();
+      case "ctrl-j": return this.insert("\n");
       case "ctrl-p": return this.openPalette();
       case "backspace":
         if (I.cur > 0) { const p = cpPrev(I.text, I.cur); I.text = I.text.slice(0, p) + I.text.slice(I.cur); I.cur = p; this.dirty = true; }
@@ -212,8 +218,8 @@ export class App {
         return;
       case "left": I.cur = ev.ctrl ? this.wordLeft() : cpPrev(I.text, I.cur); this.dirty = true; return;
       case "right": I.cur = ev.ctrl ? this.wordRight() : cpNext(I.text, I.cur); this.dirty = true; return;
-      case "home": I.cur = 0; this.dirty = true; return;
-      case "end": I.cur = I.text.length; this.dirty = true; return;
+      case "home": I.cur = I.text.lastIndexOf("\n", I.cur - 1) + 1; this.dirty = true; return;
+      case "end": { const nl = I.text.indexOf("\n", I.cur); I.cur = nl === -1 ? I.text.length : nl; this.dirty = true; return; }
       case "ctrl-u": I.text = ""; I.cur = 0; this.dirty = true; return;
       case "ctrl-w": {
         const left = this.wordLeft();
@@ -221,8 +227,8 @@ export class App {
         I.cur = left; this.dirty = true; return;
       }
       case "ctrl-l": this.msgs = []; this._wrap.clear(); this.scroll = 0; this.dirty = true; return;
-      case "up": return this.histNav(-1);
-      case "down": return this.histNav(1);
+      case "up": return this.lineNav(-1) || this.histNav(-1);
+      case "down": return this.lineNav(1) || this.histNav(1);
       case "pgup": this.scroll += this.viewH() - 1; this.dirty = true; return;
       case "pgdn": this.scroll = Math.max(0, this.scroll - this.viewH() + 1); this.dirty = true; return;
       case "esc":
@@ -259,6 +265,26 @@ export class App {
     return i;
   }
 
+  // move the cursor between input lines; returns true if it moved
+  lineNav(dir) {
+    const I = this.input;
+    if (!I.text.includes("\n")) return false;
+    const start = I.text.lastIndexOf("\n", I.cur - 1) + 1;
+    const col = I.cur - start;
+    if (dir === -1) {
+      if (start === 0) return false;
+      const prevStart = I.text.lastIndexOf("\n", start - 2) + 1;
+      I.cur = Math.min(prevStart + col, start - 1);
+    } else {
+      const end = I.text.indexOf("\n", I.cur);
+      if (end === -1) return false;
+      const nextEnd = I.text.indexOf("\n", end + 1);
+      I.cur = Math.min(end + 1 + col, nextEnd === -1 ? I.text.length : nextEnd);
+    }
+    this.dirty = true;
+    return true;
+  }
+
   histNav(dir) {
     const I = this.input;
     if (!I.hist.length) return;
@@ -278,9 +304,14 @@ export class App {
       if (!this.busy) this.command("/model");
       return;
     }
-    if (this._inputPos && y === this._inputPos.y) {
+    if (this._inputPos && y >= this._inputPos.y && y < this._inputPos.y + (this._inputPos.h || 1)) {
       const I = this.input;
-      I.cur = Math.max(0, Math.min(I.text.length, (x - this._inputPos.textX) + this._hscroll));
+      const lines = I.text.split("\n");
+      const li = Math.min(lines.length - 1, (this._vscroll || 0) + (y - this._inputPos.y));
+      let off = 0;
+      for (let i = 0; i < li; i++) off += lines[i].length + 1;
+      const col = Math.max(0, (x - this._inputPos.textX) + (li === 0 || lines.length === 1 ? this._hscroll : 0));
+      I.cur = Math.min(off + Math.min(col, lines[li].length), I.text.length);
       this.dirty = true;
     }
   }
@@ -550,7 +581,7 @@ export class App {
           "**Evolution** — Aion learns from your reactions; `/genome` shows rules + confidence · `/genome pin <n>`",
           "**Sessions** — auto-saved · `/sessions` browse & resume · `aion --continue` · `/export` → Markdown",
           "**Scroll** — mouse wheel · `PgUp`/`PgDn` · `Esc` jump to bottom",
-          "**Input** — `↑↓` history · `Ctrl+←→` word jump · `Ctrl+U` clear line · click to place cursor",
+          "**Input** — `↑↓` history/lines · `Ctrl+J` or `\\`+`↵` newline · `Ctrl+←→` word jump · `Ctrl+U` clear · click to place cursor",
           "**Models** — `/model` picker (or click the model name below) · `/models` · `/router`",
           "**Memory** — `/memory` · `/facts` · `/remember <fact>` · `/forget <text>` · `/dream`",
           "**More** — `/skills` · `/persona <text>` · `/setup` · `/clear` · `/reset` · `/exit`",
@@ -813,7 +844,7 @@ export class App {
   }
 
   // ── rendering ──────────────────────────────────────────
-  viewH() { return Math.max(1, this.term.size().rows - 4); }
+  viewH() { return Math.max(1, this.term.size().rows - 3 - (this._lastInputH || 1)); }
 
   chatLines(width) {
     const out = [];
@@ -842,32 +873,57 @@ export class App {
     return out;
   }
 
-  // builds the 2-row input block; returns rows + relative click info
+  // builds the input block (1..6 text rows + footer); returns rows + click info
   buildInput(w) {
     const I = this.input;
     const inner = w - 7;
-    let h = this._hscroll || 0;
-    if (I.cur < h) h = I.cur;
-    if (I.cur > h + inner - 1) h = Math.max(0, I.cur - inner + 1);
-    this._hscroll = h;
-    const view = I.text.slice(h, h + inner);
-    const curIdx = I.cur - h;
-    const barCol = this.capture ? 214 : 99;
+    const lines = I.text.split("\n");
 
-    let content = "";
-    let used = 0;
-    if (!I.text.length) {
-      content = "\x1b[7m \x1b[27m" + fg(242) + (this.capture ? this.capture.label : 'Ask anything…   "/": commands') ;
-      used = 1 + (this.capture ? this.capture.label.length : 30);
-    } else {
-      for (let i = 0; i < view.length; i++) {
-        content += i === curIdx ? "\x1b[7m" + view[i] + "\x1b[27m" : view[i];
-      }
-      used = view.length;
-      if (curIdx >= view.length) { content += "\x1b[7m \x1b[27m"; used++; }
+    // locate the cursor: line index + column
+    let off = 0, cl = 0, cc = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (I.cur <= off + lines[i].length) { cl = i; cc = I.cur - off; break; }
+      off += lines[i].length + 1;
+      if (i === lines.length - 1) { cl = i; cc = lines[i].length; }
     }
-    const textRow = " " + BG + fg(barCol) + "▌ " + fg(87) + "❯ " + fg(253) + content +
-      " ".repeat(Math.max(0, w - 6 - used)) + RESET;
+
+    // vertical window (max 6 rows) keeps the cursor line visible
+    const maxRows = 6;
+    let top = this._vscroll || 0;
+    if (cl < top) top = cl;
+    if (cl > top + maxRows - 1) top = cl - maxRows + 1;
+    top = Math.max(0, Math.min(top, Math.max(0, lines.length - maxRows)));
+    this._vscroll = top;
+
+    // horizontal scroll follows the cursor on its line
+    let h = this._hscroll || 0;
+    if (cc < h) h = cc;
+    if (cc > h + inner - 1) h = Math.max(0, cc - inner + 1);
+    this._hscroll = h;
+
+    const barCol = this.capture ? 214 : 99;
+    const rowsOut = lines.slice(top, top + maxRows).map((ln, vi) => {
+      const isCur = top + vi === cl;
+      const view = isCur ? ln.slice(h, h + inner) : ln.slice(0, inner);
+      let content = "", used = 0;
+      if (!I.text.length) {
+        content = "\x1b[7m \x1b[27m" + fg(242) + (this.capture ? this.capture.label : 'Ask anything…   "/": commands');
+        used = 1 + (this.capture ? this.capture.label.length : 30);
+      } else if (isCur) {
+        const curIdx = cc - h;
+        for (let i = 0; i < view.length; i++) {
+          content += i === curIdx ? "\x1b[7m" + view[i] + "\x1b[27m" : view[i];
+        }
+        used = view.length;
+        if (curIdx >= view.length) { content += "\x1b[7m \x1b[27m"; used++; }
+      } else {
+        content = view;
+        used = visLen(view);
+      }
+      const prompt = top + vi === 0 ? "❯ " : "· ";
+      return " " + BG + fg(barCol) + "▌ " + fg(87) + prompt + fg(253) + content +
+        " ".repeat(Math.max(0, w - 6 - used)) + RESET;
+    });
 
     const modelId = this.cfg.model.id;
     const prov = this.cfg.model.provider === "ollama" ? "Ollama" : this.cfg.model.provider;
@@ -878,7 +934,7 @@ export class App {
       " ".repeat(Math.max(0, w - 4 - visLen(footPlain))) + RESET;
 
     return {
-      textRow, footerRow,
+      rows: rowsOut, footerRow,
       textXrel: 5,                                  // margin(1) + bar(2) + "❯ "(2) → first char col
       modelX1rel: 1 + 2 + 7,                        // margin + bar + "aion · "
       modelX2rel: 1 + 2 + 7 + modelId.length,
@@ -914,10 +970,10 @@ export class App {
     const w = Math.min(cols - 6, 84);
     const x = Math.max(1, Math.floor((cols - w) / 2));
     const inp = this.buildInput(w);
+    this._lastInputH = inp.rows.length;
     const margin = " ".repeat(x - 1);
-    S[y] = margin + inp.textRow.slice(1);
-    this._inputPos = { y, textX: x + inp.textXrel - 1 };
-    y++;
+    this._inputPos = { y, h: inp.rows.length, textX: x + inp.textXrel - 1 };
+    for (const row of inp.rows) { S[y] = margin + row.slice(1); y++; }
     S[y] = margin + inp.footerRow.slice(1);
     this._modelZone = { y, x1: x + inp.modelX1rel, x2: x + inp.modelX2rel };
     y += 2;
@@ -929,7 +985,10 @@ export class App {
   }
 
   renderChat(S, cols, rows) {
-    const viewH = rows - 4;
+    const inp = this.buildInput(cols - 2);
+    const ih = inp.rows.length;
+    this._lastInputH = ih;
+    const viewH = Math.max(1, rows - 3 - ih);
     const lines = this.chatLines(cols);
     const maxScroll = Math.max(0, lines.length - viewH);
     if (this.scroll > maxScroll) this.scroll = maxScroll;
@@ -937,9 +996,9 @@ export class App {
     for (let r = 0; r < viewH; r++) {
       S[1 + r] = lines[start + r] ?? "";
     }
-    const inp = this.buildInput(cols - 2);
-    S[rows - 2] = inp.textRow;
-    this._inputPos = { y: rows - 2, textX: 1 + inp.textXrel };
+    const firstY = rows - 1 - ih;
+    for (let i = 0; i < ih; i++) S[firstY + i] = inp.rows[i];
+    this._inputPos = { y: firstY, h: ih, textX: 1 + inp.textXrel };
     S[rows - 1] = inp.footerRow;
     this._modelZone = { y: rows - 1, x1: 1 + inp.modelX1rel, x2: 1 + inp.modelX2rel };
   }

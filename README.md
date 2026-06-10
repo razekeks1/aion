@@ -8,7 +8,8 @@
 [![node >= 18](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![license MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078d4)](#)
-[![tests](https://img.shields.io/badge/tests-74%20passing-brightgreen)](test/)
+[![CI](https://img.shields.io/badge/CI-3%20OS%20%C3%97%203%20node-brightgreen?logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
+[![tests](https://img.shields.io/badge/tests-79%20passing-brightgreen)](test/)
 
 *Hermes delivers messages. OpenClaw follows orders.*
 ***Aion is eternity itself — the agent that doesn't just grow with you, it evolves.***
@@ -129,7 +130,8 @@ Aion writes, saves and reuses its own skills as it works. Successful multi-tool 
 - **Mouse-native** — wheel scrolls, click the model name to switch brains, click to place the cursor
 - **Resize-proof** — the whole frame re-renders from state; emoji-safe input editing
 - **Clickable links** — URLs are real hyperlinks (Ctrl+click in Windows Terminal)
-- Keys: `↵` send · `↑↓` history · `Ctrl+P` palette · `PgUp/PgDn` scroll · `Esc` interrupt · `Ctrl+L` clear
+- **Multiline input** — `Ctrl+J` or trailing `\` + `↵` for newlines; pasted blocks keep their line breaks
+- Keys: `↵` send · `↑↓` history/lines · `Ctrl+P` palette · `PgUp/PgDn` scroll · `Esc` interrupt · `Ctrl+L` clear
 
 ## Daily use
 
@@ -174,7 +176,8 @@ Everything is local. Nothing leaves your machine except the LLM calls you config
 ## Development
 
 ```cmd
-npm test        # 74 smoke + TUI-hardening tests, sandboxed (never touches your ~/.aion)
+npm test        # 79 smoke + TUI-hardening tests, sandboxed (never touches your ~/.aion)
+                # CI runs them on Windows, Ubuntu and macOS × node 18/20/22
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). The only rule that's sacred: **zero runtime dependencies**.

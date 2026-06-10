@@ -73,6 +73,12 @@ export class Term {
         continue;
       }
       if (buf[0] === "\x1b") {
+        // Alt+Enter → newline in the input
+        if (buf[1] === "\r" || buf[1] === "\n") {
+          out.push({ type: "key", name: "ctrl-j" });
+          buf = buf.slice(2);
+          continue;
+        }
         // SGR mouse: \x1b[<b;x;yM (press) or m (release)
         let m = buf.match(/^\x1b\[<(\d+);(\d+);(\d+)([Mm])/);
         if (m) {
@@ -116,7 +122,8 @@ export class Term {
       }
       const ch = buf[0];
       buf = buf.slice(1);
-      if (ch === "\r" || ch === "\n") out.push({ type: "key", name: "enter" });
+      if (ch === "\r") out.push({ type: "key", name: "enter" });
+      else if (ch === "\n") out.push({ type: "key", name: "ctrl-j" }); // Ctrl+J → newline
       else if (ch === "\x7f" || ch === "\b") out.push({ type: "key", name: "backspace" });
       else if (ch === "\t") out.push({ type: "key", name: "tab" });
       else if (ch === "\x03") out.push({ type: "key", name: "ctrl-c" });

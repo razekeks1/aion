@@ -1,0 +1,45 @@
+{
+  "name": "aion-agent",
+  "version": "3.1.0",
+  "description": "AION — The eternal agent. Triadic memory, dream cycles, neural routing, multi-model council, self-evolving genome. Zero dependencies.",
+  "type": "module",
+  "bin": {
+    "aion": "bin/aion.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node bin/aion.mjs",
+    "test": "node test/smoke.mjs && node test/tui-commands.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aion-agent/aion.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aion-agent/aion/issues"
+  },
+  "homepage": "https://github.com/aion-agent/aion#readme",
+  "keywords": [
+    "ai",
+    "agent",
+    "assistant",
+    "terminal",
+    "tui",
+    "memory",
+    "ollama",
+    "llm",
+    "multi-model",
+    "zero-dependency",
+    "cli"
+  ],
+  "author": "Romeo Söylemez",
+  "license": "MIT"
+}

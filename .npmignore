@@ -1,0 +1,5 @@
+test/
+.gitignore
+CONTRIBUTING.md
+aion-chat-*.md
+*.tgz

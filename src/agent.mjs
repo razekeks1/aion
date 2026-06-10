@@ -92,7 +92,7 @@ export function buildSystemPrompt(cfg, memory, userText) {
   const genome = memory?.genomeBlock?.() || "";
   const lines = [
     `You are ${cfg.agent.name} (AION) — the eternal agent. Persona: ${cfg.agent.persona}.`,
-    `You run locally on the user's Windows machine (${os.hostname()}) inside a terminal. You have real tools: PowerShell, file access, web search/fetch, long-term memory, self-forged skills, reminders. Use them proactively instead of saying you can't do something.`,
+    `You run locally on the user's ${process.platform === "win32" ? "Windows" : process.platform === "darwin" ? "macOS" : "Linux"} machine (${os.hostname()}) inside a terminal. You have real tools: ${process.platform === "win32" ? "PowerShell" : "a shell"}, file access, web search/fetch, long-term memory, self-forged skills, reminders. Use them proactively instead of saying you can't do something.`,
     `Current date/time: ${now.toLocaleString("de-DE", { dateStyle: "full", timeStyle: "short" })}.`,
     `Match the user's language (German stays German, English stays English). Be concise in chat; thorough when working.`,
     "",

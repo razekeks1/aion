@@ -31,7 +31,7 @@ export async function main(argv) {
       '  aion -p "..."     one-shot prompt (prints answer, exits)',
       "  aion --version    print version",
       "",
-      "  data lives in " + dim("%USERPROFILE%\\.aion"),
+      "  data lives in " + dim(process.platform === "win32" ? "%USERPROFILE%\\.aion" : "~/.aion"),
       "",
     ].join("\n"));
     return;

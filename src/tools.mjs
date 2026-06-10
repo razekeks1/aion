@@ -8,8 +8,8 @@ const REMINDERS_PATH = path.join(AION_HOME, "reminders.json");
 
 export function toolDefinitions() {
   return [
-    tool("run_shell", "Run a PowerShell command on the user's Windows machine and return stdout/stderr. Use for anything system-related: listing files, checking processes, git, installing things, opening apps.", {
-      command: { type: "string", description: "The PowerShell command to run" },
+    tool("run_shell", `Run a ${process.platform === "win32" ? "PowerShell" : "shell (sh)"} command on the user's machine and return stdout/stderr. Use for anything system-related: listing files, checking processes, git, installing things, opening apps.`, {
+      command: { type: "string", description: `The ${process.platform === "win32" ? "PowerShell" : "sh"} command to run` },
     }, ["command"]),
     tool("read_file", "Read a text file from disk.", {
       path: { type: "string", description: "Absolute or relative file path" },
@@ -84,8 +84,11 @@ export async function executeTool(name, args, ctx) {
 }
 
 function runShell(command) {
+  const [bin, args] = process.platform === "win32"
+    ? ["powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", command]]
+    : ["/bin/sh", ["-c", command]];
   return new Promise((resolve) => {
-    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", command],
+    execFile(bin, args,
       { timeout: 60000, maxBuffer: 4 * 1024 * 1024, windowsHide: true },
       (error, stdout, stderr) => {
         let out = "";

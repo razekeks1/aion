@@ -113,6 +113,23 @@ app.msgs.push({ kind: "ai", text: "🚀".repeat(200) + " " + "Donaudampfschifffa
 try { app.chatLines(60); check("chatLines handles unicode walls", true); }
 catch (e) { check("chatLines crashed: " + e.message, false); }
 
+// /sessions: empty state, then resume a saved one
+await app.command("/sessions");
+check("/sessions empty state ok", true);
+{
+  const { saveSession } = await import("../src/sessions.mjs");
+  saveSession("tuitest-1", [
+    { role: "user", content: "resume me" },
+    { role: "assistant", content: "sure" },
+  ]);
+  const cmdP = app.command("/sessions");
+  await new Promise((r) => setTimeout(r, 20)); // let the picker open
+  app.overlayEvent({ type: "key", name: "enter" });
+  await cmdP;
+  check("/sessions resumes history", app.history.some((m) => m.content === "resume me"));
+  check("/sessions switches id", app.sessionId === "tuitest-1");
+}
+
 // overlay picker open/close
 const p = app.pick("test", [{ label: "a", value: 1 }, { label: "b", value: 2 }]);
 app.overlayEvent({ type: "key", name: "down" });

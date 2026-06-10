@@ -7,8 +7,8 @@
 [![zero dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](package.json)
 [![node >= 18](https://img.shields.io/badge/node-%3E%3D18-339933?logo=node.js&logoColor=white)](https://nodejs.org)
 [![license MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![platform Windows-first](https://img.shields.io/badge/platform-Windows--first-0078d4?logo=windows&logoColor=white)](#)
-[![tests](https://img.shields.io/badge/smoke%20tests-69%20passing-brightgreen)](test/)
+[![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078d4)](#)
+[![tests](https://img.shields.io/badge/tests-74%20passing-brightgreen)](test/)
 
 *Hermes delivers messages. OpenClaw follows orders.*
 ***Aion is eternity itself — the agent that doesn't just grow with you, it evolves.***
@@ -72,7 +72,7 @@ Model overloaded? Rate-limited? Network blip? Aion retries with backoff, then **
 Simple turns route to your fast/local model, hard ones to the flagship — automatically, by analyzing the prompt. Faster *and* cheaper, toggle with `/router`.
 
 ### ↻ Sessions that survive
-Every conversation auto-saves. `aion --continue` resumes exactly where you left off — even one-shot `aion -p` calls are resumable. `/export` writes the chat as clean Markdown.
+Every conversation auto-saves. `aion --continue` resumes exactly where you left off, `/sessions` opens a picker to jump back into any past conversation — even one-shot `aion -p` calls are resumable. `/export` writes the chat as clean Markdown.
 
 ### ⚒ Self-forging skills
 Aion writes, saves and reuses its own skills as it works. Successful multi-tool workflows are auto-learned as procedures — no command needed.
@@ -174,7 +174,7 @@ Everything is local. Nothing leaves your machine except the LLM calls you config
 ## Development
 
 ```cmd
-npm test        # 69 smoke + TUI-hardening tests, sandboxed (never touches your ~/.aion)
+npm test        # 74 smoke + TUI-hardening tests, sandboxed (never touches your ~/.aion)
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). The only rule that's sacred: **zero runtime dependencies**.

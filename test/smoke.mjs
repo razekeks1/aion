@@ -182,6 +182,19 @@ check("similarity low for unrelated", similarity("Pizza Rezept", "Quantenphysik 
   m.facts = savedFacts;
 }
 
+// ── sessions list ordering + shell tool ──
+{
+  const { listSessions } = await import("../src/sessions.mjs");
+  const { executeTool } = await import("../src/tools.mjs");
+  saveSession("smoketest-old", [{ role: "user", content: "old" }]);
+  await new Promise((r) => setTimeout(r, 15));
+  saveSession("smoketest-new", [{ role: "user", content: "new" }]);
+  const all = listSessions();
+  check("listSessions newest first", all[0]?.id === "smoketest-new");
+  const out = await executeTool("run_shell", { command: "echo aion-shell-ok" }, {});
+  check("run_shell cross-platform", String(out).includes("aion-shell-ok"));
+}
+
 try { fs.rmSync(process.env.AION_HOME, { recursive: true, force: true }); } catch {}
 console.log(failed ? `\n${failed} FAILED` : "\nall smoke tests passed");
 process.exit(failed ? 1 : 0);

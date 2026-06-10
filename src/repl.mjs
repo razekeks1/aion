@@ -9,7 +9,7 @@ import { loadSkills, dueReminders } from "./tools.mjs";
 import { saveConfig } from "./config.mjs";
 import { runSetup, collectModels } from "./setup.mjs";
 import { PROVIDERS } from "./providers.mjs";
-import { newSessionId, saveSession, exportMarkdown } from "./sessions.mjs";
+import { newSessionId, saveSession, exportMarkdown, listSessions } from "./sessions.mjs";
 import path from "node:path";
 import fs from "node:fs";
 import {
@@ -46,6 +46,7 @@ const TIPS = [
 const PALETTE = [
   ["council", "multi-model deliberation on a question", true],
   ["export", "save conversation as Markdown", false],
+  ["sessions", "browse & resume past conversations", false],
   ["genome", "show evolved rules with confidence", false],
   ["model", "switch main model", false],
   ["models", "list available models", false],
@@ -547,7 +548,7 @@ export class App {
           "**Chat** — type & ↵ · `Esc` stop generation · `Ctrl+C` clear input / quit · `Ctrl+P` command palette",
           "**Council** — `/council <question>` — parallel multi-model deliberation (no arg = redo last prompt)",
           "**Evolution** — Aion learns from your reactions; `/genome` shows rules + confidence · `/genome pin <n>`",
-          "**Sessions** — auto-saved · resume with `aion --continue` · `/export` saves the chat as Markdown",
+          "**Sessions** — auto-saved · `/sessions` browse & resume · `aion --continue` · `/export` → Markdown",
           "**Scroll** — mouse wheel · `PgUp`/`PgDn` · `Esc` jump to bottom",
           "**Input** — `↑↓` history · `Ctrl+←→` word jump · `Ctrl+U` clear line · click to place cursor",
           "**Models** — `/model` picker (or click the model name below) · `/models` · `/router`",
@@ -572,6 +573,33 @@ export class App {
           fs.writeFileSync(file, exportMarkdown(this.history, { agentName: this.cfg.agent.name, model: this.cfg.model.id }), "utf8");
           sys(`${ok("✔")} exported ${this.history.filter((m) => m.role === "user").length} turns → ${aqua(file)}`);
         } catch (e) { sys(err("✖ export failed: ") + e.message); }
+        break;
+      }
+
+      case "sessions": {
+        const all = listSessions();
+        if (!all.length) { sys(dim("no saved sessions yet")); break; }
+        const fmtAge = (ts) => {
+          const m = Math.round((Date.now() - ts) / 60000);
+          return m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`;
+        };
+        const items = all.slice(0, 20).map((s) => ({
+          label: (s.id === this.sessionId ? ok("● ") : "  ") + s.title.slice(0, 48),
+          hint: `${s.turns} turns · ${fmtAge(s.updated)}`,
+          value: s.id,
+        }));
+        const picked = await this.pick("Resume session", items);
+        if (!picked || picked === this.sessionId) break;
+        const sess = all.find((s) => s.id === picked);
+        if (!sess) break;
+        this.sessionId = sess.id;
+        this.history = sess.history.slice(-40);
+        this.msgs = []; this._wrap.clear(); this.scroll = 0;
+        for (const m of this.history) {
+          if (m.role === "user") this.add("user", String(m.content));
+          else if (m.role === "assistant") this.add("ai", renderMarkdown(String(m.content)));
+        }
+        sys(dim(`↻ resumed "${sess.title.slice(0, 50)}" · ${sess.turns} turns`));
         break;
       }
 

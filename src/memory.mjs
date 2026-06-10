@@ -152,6 +152,7 @@ export class Memory {
   async dream(cfg, modelRef, { log = () => {} } = {}) {
     const recent = this.episodes.slice(-Math.max(this.newEpisodesSinceDream, 5));
     let extracted = 0;
+    const factTexts = []; // what was learned — surfaced to the user, not just counted
 
     if (recent.length && modelRef?.id) {
       log("consolidating episodes → facts…");
@@ -173,7 +174,11 @@ export class Memory {
         const json = extractJson(out);
         if (json) {
           for (const f of json.facts || []) {
-            if (f?.text) { this.addFact(f.text, { type: f.type || "general", importance: clamp(f.importance ?? 0.6) }); extracted++; }
+            if (f?.text) {
+              this.addFact(f.text, { type: f.type || "general", importance: clamp(f.importance ?? 0.6) });
+              factTexts.push(f.text);
+              extracted++;
+            }
           }
           for (const t of json.traits || []) {
             if (t && !this.user.traits.some((x) => similarity(x, t) > 0.8)) this.user.traits.push(t);
@@ -266,7 +271,12 @@ export class Memory {
 
     this.newEpisodesSinceDream = 0;
     this.persist();
-    return { extracted, mergedCount, pruned, genes: this.genome.rules.length };
+    return {
+      extracted, mergedCount, pruned,
+      genes: this.genome.rules.length,
+      factTexts,
+      ruleTexts: this.genome.rules.map((r) => r.text),
+    };
   }
 }
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.6.0
+- Live context gauge in the status bar (`⛁ 12.4k/512k`): token estimate vs auto-detected model window (exact via Ollama `/api/show`, curated table for cloud models)
+- `/compact` — summarizes old history via the fast model, keeps the last 4 messages verbatim; auto-compacts at 85% context usage
+- `/dream` now shows *what* it learned: extracted facts and evolved genome rules, not just counts
+- `/memory` explains the triadic brain (episodic/semantic/procedural/genome) with pointers
+- `/stats` shows context usage; context window re-detected on every model switch
+
 ## 3.5.0
 - `/goal <mission>` — autonomous goal mode: Aion iterates with tools until it verifies completion (safety limit, `resume`, `clear`, `max <n>`)
 - `/loop [interval] <prompt>` — recurring prompts; without an interval Aion self-paces the next run; status-bar countdown, `/loop stop`

@@ -135,6 +135,19 @@ check("similarity low for unrelated", similarity("Pizza Rezept", "Quantenphysik 
   check("cpNext clamps at end", cpNext(t, t.length) === t.length);
 }
 
+// ── context window detection ──
+{
+  const { guessContextWindow, modelContextWindow } = await import("../src/providers.mjs");
+  check("ctx guess claude", guessContextWindow("claude-sonnet-4-6") === 200000);
+  check("ctx guess gemini pro", guessContextWindow("gemini-3-pro") === 1000000);
+  check("ctx guess gpt-oss", guessContextWindow("gpt-oss:120b-cloud") === 128000);
+  check("ctx guess unknown → 32k", guessContextWindow("mystery-model") === 32000);
+  // unreachable ollama host falls back to the table
+  const cfg = { providers: { ollama: { host: "http://127.0.0.1:9" } } };
+  const n = await modelContextWindow(cfg, { provider: "ollama", id: "llama3.1:8b" });
+  check("ctx fallback when host down", n === 128000);
+}
+
 // ── /loop interval parsing ──
 check("parseInterval 5m", parseInterval("5m") === 300000);
 check("parseInterval 90s", parseInterval("90s") === 90000);

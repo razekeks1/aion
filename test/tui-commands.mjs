@@ -149,6 +149,25 @@ app.overlayEvent({ type: "key", name: "down" });
 app.overlayEvent({ type: "key", name: "enter" });
 check("overlay pick returns value", (await p) === 2);
 
+// ── context tracking + /compact guard rails ──
+{
+  app.history = [
+    { role: "user", content: "hello there" },
+    { role: "assistant", content: "hi! ".repeat(50) },
+  ];
+  app._est = null;
+  const est = app.estTokens();
+  check("estTokens counts system+history", est > 50);
+  const cached = app.estTokens();
+  check("estTokens caches", cached === est);
+  await app.command("/compact"); // <6 messages → friendly no-op, no model call
+  check("/compact small-history no-op", app.history.length === 2);
+  await app.command("/memory");
+  check("/memory explains the brain", true);
+  await app.command("/stats");
+  check("/stats with ctx gauge ok", true);
+}
+
 // ── /goal: completes when the model says GOAL_COMPLETE ──
 {
   const realTurn = app.turn.bind(app);

@@ -3,12 +3,12 @@
 // bar, thought timers, per-answer meta line, bottom status bar, ctrl+p palette.
 import os from "node:os";
 import { Term, wrapAnsi, padTrunc, visLen, stripAnsi } from "./tui.mjs";
-import { runTurn, runCouncil, summarizeTurn } from "./agent.mjs";
+import { runTurn, runCouncil, summarizeTurn, buildSystemPrompt } from "./agent.mjs";
 import { Memory, detectFeedback } from "./memory.mjs";
 import { loadSkills, dueReminders } from "./tools.mjs";
 import { saveConfig } from "./config.mjs";
 import { runSetup, collectModels } from "./setup.mjs";
-import { PROVIDERS, quickChat } from "./providers.mjs";
+import { PROVIDERS, quickChat, modelContextWindow } from "./providers.mjs";
 import { newSessionId, saveSession, exportMarkdown, listSessions } from "./sessions.mjs";
 import path from "node:path";
 import fs from "node:fs";
@@ -53,7 +53,8 @@ const PALETTE = [
   ["model", "switch main model", false],
   ["models", "list available models", false],
   ["router", "toggle neural router", false],
-  ["memory", "memory overview", false],
+  ["memory", "how the triadic memory works + counts", false],
+  ["compact", "summarize old history to free context", false],
   ["facts", "list remembered facts", false],
   ["remember", "save a fact to memory", true],
   ["forget", "delete matching memories", true],
@@ -80,6 +81,8 @@ export function parseInterval(tok) {
   if (!m) return null;
   return +m[1] * { s: 1000, m: 60000, h: 3600000, d: 86400000 }[m[2]];
 }
+
+const fmtTok = (n) => (n >= 1000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "k" : String(n));
 
 const fmtMs = (ms) => {
   if (ms < 60000) return `${Math.max(1, Math.round(ms / 1000))}s`;
@@ -121,6 +124,9 @@ export class App {
     this._tip = TIPS[Math.floor(Math.random() * TIPS.length)];
     this.goal = null;       // {text, iter, max, resumeAt}
     this.autoLoop = null;   // {prompt, intervalMs|null (self-paced), runs, nextAt}
+    this._ctxSize = null;   // detected model context window (tokens)
+    this._est = null;       // cached context-usage estimate
+    this.refreshCtx();
     this.sessionId = resume?.id || newSessionId();
     if (resume?.history?.length) {
       this.history = resume.history.slice(-40);
@@ -136,6 +142,58 @@ export class App {
     try {
       saveSession(this.sessionId, this.history, { model: this.cfg.model.id });
     } catch {}
+  }
+
+  // ── context tracking ───────────────────────────────────
+  // ≈4 chars/token across DE/EN — good enough for a live gauge.
+  estTokens() {
+    const last = this.history[this.history.length - 1];
+    const key = this.history.length + "|" + (last ? String(last.content).length : 0);
+    if (this._est?.key === key) return this._est.val;
+    let chars = 0;
+    try { chars += buildSystemPrompt(this.cfg, this.memory, "").length; } catch {}
+    for (const m of this.history) chars += String(m.content).length + 16;
+    const val = Math.ceil(chars / 4);
+    this._est = { key, val };
+    return val;
+  }
+
+  refreshCtx() {
+    this._ctxSize = null;
+    modelContextWindow(this.cfg, this.cfg.model)
+      .then((n) => { this._ctxSize = n; this.dirty = true; })
+      .catch(() => {});
+  }
+
+  async compactNow(auto = false) {
+    if (this.history.length < 6) {
+      if (!auto) this.add("sys", dim("history is small — nothing to compact yet"));
+      return;
+    }
+    const before = this.estTokens();
+    this.busy = true; this.status = "compacting context"; this.dirty = true;
+    try {
+      const keep = this.history.slice(-4);   // recent turns stay verbatim
+      const old = this.history.slice(0, -4);
+      const m = this.cfg.fastModel?.id ? this.cfg.fastModel : this.cfg.model;
+      const summary = await quickChat(this.cfg, {
+        provider: m.provider, model: m.id, maxLen: 8000,
+        system: "You compress conversation history for an AI agent. Preserve every fact, name, number, decision, code detail, open task and user preference. Output one dense summary in the conversation's language — no preamble.",
+        prompt: old.map((x) => `${x.role}: ${String(x.content).slice(0, 1500)}`).join("\n\n"),
+      });
+      this.history = [
+        { role: "user", content: "(Recap our conversation so far.)" },
+        { role: "assistant", content: "Summary of the conversation so far:\n" + summary },
+        ...keep,
+      ];
+      this._est = null;
+      this.saveSession();
+      this.add("sys", `${ok("✔")} ${auto ? "auto-" : ""}compacted: ${fmtTok(before)} → ${fmtTok(this.estTokens())} tokens ` +
+        dim(`(${old.length} messages summarized, last ${keep.length} kept verbatim)`));
+    } catch (e) {
+      this.add("sys", err("✖ compact failed: ") + e.message);
+    }
+    this.busy = false; this.status = ""; this.dirty = true;
   }
 
   // ── lifecycle ──────────────────────────────────────────
@@ -583,6 +641,12 @@ export class App {
           this.memory.addProcedure(`auto: ${line.slice(0, 50)}`, `${toolTrace.join(" → ")} — for: ${line.slice(0, 120)}`);
         }
         this.memory.persist();
+        // context guard: compact automatically before the window overflows
+        if (this._ctxSize && this.estTokens() > 0.85 * this._ctxSize) {
+          this.add("sys", warn("⛁ context 85% full — compacting…"));
+          this.busy = false;
+          await this.compactNow(true);
+        }
       } else {
         this.msgs.splice(this.msgs.indexOf(sm), 1);
         this.add("sys", dim("(no response — try again or /model to switch)"));
@@ -683,7 +747,8 @@ export class App {
           "**Scroll** — mouse wheel · `PgUp`/`PgDn` · `Esc` jump to bottom",
           "**Input** — `↑↓` history/lines · `Ctrl+J` or `\\`+`↵` newline · `Ctrl+←→` word jump · `Ctrl+U` clear · click to place cursor",
           "**Models** — `/model` picker (or click the model name below) · `/models` · `/router`",
-          "**Memory** — `/memory` · `/facts` · `/remember <fact>` · `/forget <text>` · `/dream`",
+          "**Memory** — `/memory` explains the brain · `/facts` · `/remember` · `/forget` · `/dream`",
+          "**Context** — live gauge `⛁ used/window` in the status bar · `/compact` summarizes old history · auto-compacts at 85%",
           "**More** — `/skills` · `/persona <text>` · `/setup` · `/clear` · `/reset` · `/exit`",
         ].join("\n")));
         break;
@@ -845,6 +910,7 @@ export class App {
           const [id, provider] = picked.split("\x01");
           this.cfg.model = { provider, id };
           saveConfig(this.cfg);
+          this.refreshCtx();
           sys(`${ok("✔")} model → ${aqua(id)}`);
         }
         break;
@@ -880,12 +946,23 @@ export class App {
         break;
       }
 
-      case "memory":
+      case "memory": {
+        const m = this.memory;
         sys([
-          `${violet("◆")} ${this.memory.stats()}`,
-          `${violet("◆")} user model: ${this.memory.user.traits.length} traits · ${this.memory.user.preferences.length} preferences`,
-          this.memory.user.traits.length ? dim("  " + this.memory.user.traits.slice(0, 5).join(" · ")) : "",
+          bold("How Aion's brain works:"),
+          `${violet("◆")} ${bold("episodic")}   ${m.episodes.length} episodes ${dim("— what happened (auto-summaries of every turn)")}`,
+          `${violet("◆")} ${bold("semantic")}   ${m.facts.length} facts ${dim("— what is true (see /facts; add with /remember)")}`,
+          `${violet("◆")} ${bold("procedural")} ${m.procedures.length} procedures ${dim("— how to do things (auto-learned from tool workflows)")}`,
+          `${violet("◆")} ${bold("genome")}     ${m.genome.rules.length} rules ${dim("— behavior evolved from your feedback (see /genome)")}`,
+          `${violet("◆")} ${bold("user model")} ${m.user.traits.length} traits · ${m.user.preferences.length} preferences`,
+          m.user.traits.length ? dim("  " + m.user.traits.slice(0, 5).join(" · ")) : "",
+          dim("/dream consolidates: episodes → facts, feedback → genome, duplicates merged, stale memories pruned"),
         ].filter(Boolean).join("\n"));
+        break;
+      }
+
+      case "compact":
+        await this.compactNow(false);
         break;
 
       case "facts": {
@@ -918,7 +995,14 @@ export class App {
         try {
           const r = await this.memory.dream(this.cfg, this.cfg.fastModel?.id ? this.cfg.fastModel : this.cfg.model,
             { log: (t) => { this.status = "💤 " + t; this.dirty = true; } });
-          sys(`${violet("💤")} dream complete: ${ok("+" + r.extracted + " facts")} · ${r.mergedCount} merged · ${r.pruned} pruned · ${violet("🧬 " + (r.genes ?? 0) + " genes")}`);
+          const lines = [`${violet("💤")} dream complete: ${ok("+" + r.extracted + " facts")} · ${r.mergedCount} merged · ${r.pruned} pruned · ${violet("🧬 " + (r.genes ?? 0) + " genes")}`];
+          for (const t of (r.factTexts || []).slice(0, 10)) lines.push(dim("   + ") + t.slice(0, 90));
+          if (r.ruleTexts?.length) {
+            lines.push(violet("   🧬 evolved behavior rules:"));
+            for (const t of r.ruleTexts.slice(0, 10)) lines.push(dim("   • ") + t.slice(0, 90));
+          }
+          lines.push(dim("   (full lists: /facts · /genome — pin rules you like with /genome pin <n>)"));
+          sys(lines.join("\n"));
         } catch (e) { sys(err("✖ dream failed: ") + e.message); }
         this.busy = false; this.status = "";
         break;
@@ -947,6 +1031,7 @@ export class App {
         this.term.enter();
         this.timer = setInterval(() => { if (this.dirty || this.busy) { this.render(); this.dirty = false; } }, 33);
         this._wrap.clear();
+        this.refreshCtx();
         sys(`${ok("✔")} setup done · model ${aqua(this.cfg.model.id)}`);
         break;
       }
@@ -970,6 +1055,7 @@ export class App {
         const top = [...this.memory.facts].sort((a, b) => b.accessCount - a.accessCount).slice(0, 3);
         sys([
           `${violet("◆")} model ${aqua(this.cfg.model.id)} ${dim("(" + this.cfg.model.provider + ")")}`,
+          this._ctxSize ? `${violet("◆")} context ${fmtTok(this.estTokens())} of ${fmtTok(this._ctxSize)} tokens used ${dim(`(${Math.round(this.estTokens() / this._ctxSize * 100)}% · /compact to shrink)`)}` : "",
           `${violet("◆")} router ${this.cfg.router.enabled ? ok("on → " + this.cfg.fastModel.id) : dim("off")}`,
           `${violet("◆")} ${this.memory.stats()}`,
           top.length ? `${violet("◆")} most recalled: ${dim(top.map((f) => f.text.slice(0, 40)).join(" · "))}` : "",
@@ -992,12 +1078,14 @@ export class App {
       if (arg.startsWith(p + ":")) {
         this.cfg.model = { provider: p, id: arg.slice(p.length + 1) };
         saveConfig(this.cfg);
+        this.refreshCtx();
         this.add("sys", `${ok("✔")} model → ${aqua(this.cfg.model.id)}`);
         return;
       }
     }
     this.cfg.model = { provider: this.cfg.providers.ollama ? "ollama" : this.cfg.model.provider, id: arg };
     saveConfig(this.cfg);
+    this.refreshCtx();
     this.add("sys", `${ok("✔")} model → ${aqua(arg)}`);
   }
 
@@ -1175,6 +1263,13 @@ export class App {
         left += "  " + violet("⟳") + dim(` ${fmtMs(Math.max(0, this.autoLoop.nextAt - Date.now()))}`);
       }
       right = bold("ctrl+p") + dim(" commands") + "  " + dim(stats + " · v" + this.version) + " ";
+    }
+    // live context gauge: estimated tokens vs detected model window
+    if (this._ctxSize && this.history.length) {
+      const est = this.estTokens();
+      const pct = est / this._ctxSize;
+      const gauge = `⛁ ${fmtTok(est)}/${fmtTok(this._ctxSize)}`;
+      right = (pct > 0.9 ? err(gauge) : pct > 0.7 ? warn(gauge) : dim(gauge)) + "  " + right;
     }
     if (this.scroll > 0) right = dim(`↑${this.scroll} `) + right;
     const gap = Math.max(1, cols - visLen(left) - visLen(right));

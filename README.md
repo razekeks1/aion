@@ -9,7 +9,7 @@
 [![license MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078d4)](#)
 [![CI](https://img.shields.io/badge/CI-3%20OS%20%C3%97%203%20node-brightgreen?logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
-[![tests](https://img.shields.io/badge/tests-95%20passing-brightgreen)](test/)
+[![tests](https://img.shields.io/badge/tests-106%20passing-brightgreen)](test/)
 
 *Hermes delivers messages. OpenClaw follows orders.*
 ***Aion is eternity itself — the agent that doesn't just grow with you, it evolves.***
@@ -136,6 +136,7 @@ Aion writes, saves and reuses its own skills as it works. Successful multi-tool 
 - **Clickable links** — URLs are real hyperlinks (Ctrl+click in Windows Terminal)
 - **Multiline input** — `Ctrl+J` or trailing `\` + `↵` for newlines; pasted blocks keep their line breaks
 - **Per-answer stats** — every reply shows model, latency, tokens and tok/s in a subtle meta line
+- **Context awareness** — live `⛁ used/window` gauge (window auto-detected per model), `/compact` summarizes old history, auto-compacts before overflow
 - Keys: `↵` send · `↑↓` history/lines · `Ctrl+P` palette · `PgUp/PgDn` scroll · `Esc` interrupt · `Ctrl+L` clear
 
 ## Daily use

@@ -133,6 +133,43 @@ export async function pingOllama(cfg) {
   }
 }
 
+// ── context window detection ───────────────────────────────
+// Ollama models: exact value from /api/show. Cloud models: curated table.
+const CTX_TABLE = [
+  [/gpt-4\.1|gemini-3|gemini.*pro|gemini.*flash/i, 1000000],
+  [/gpt-5/i, 256000],
+  [/claude/i, 200000],
+  [/glm/i, 200000],
+  [/grok|kimi|qwen3-coder|qwen3|minimax/i, 256000],
+  [/deepseek|gpt-oss|llama|mistral|gemma/i, 128000],
+];
+
+export function guessContextWindow(id) {
+  for (const [re, n] of CTX_TABLE) if (re.test(id)) return n;
+  return 32000; // conservative default for unknown models
+}
+
+export async function modelContextWindow(cfg, m) {
+  if (m?.provider === "ollama") {
+    try {
+      const res = await fetch(`${ollamaBase(cfg)}/api/show`, {
+        method: "POST",
+        headers: ollamaHeaders(cfg),
+        body: JSON.stringify({ model: m.id }),
+        signal: AbortSignal.timeout(6000),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        const info = d.model_info || {};
+        for (const k of Object.keys(info)) {
+          if (k.endsWith(".context_length") && info[k] > 0) return info[k];
+        }
+      }
+    } catch {}
+  }
+  return guessContextWindow(m?.id || "");
+}
+
 // ── unified chat ────────────────────────────────────────────
 // chat(cfg, { provider, model, messages, tools, onToken }) →
 //   { content, toolCalls: [{id, name, arguments}], usage }

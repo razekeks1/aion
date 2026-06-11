@@ -135,8 +135,40 @@ export async function runSetup(cfg, rl) {
     const { runTelegramSetup } = await import("./telegram.mjs");
     await runTelegramSetup(cfg, rl);
   } else if (wantTg.value === "rm") {
+    const { stopListener, uninstallAutostart } = await import("./telegram.mjs");
+    stopListener();
+    await uninstallAutostart().catch(() => {});
     delete cfg.telegram;
-    console.log(`  ${ok("✔")} Telegram disconnected`);
+    console.log(`  ${ok("✔")} Telegram disconnected (listener stopped, autostart removed)`);
+  }
+
+  // ── Step 6b: listener autostart ───────────────────────
+  if (cfg.telegram?.token && cfg.telegram?.userId) {
+    const { listenerPid, startListenerBackground, installAutostart, uninstallAutostart } = await import("./telegram.mjs");
+    const running = listenerPid();
+    const cur = cfg.telegram.autostart
+      ? ok("on") + dim(" — starts with the PC")
+      : dim("off");
+    const autoOpts = [
+      { label: "Always-on" + dim("  — start now in the background + at every PC start (recommended)"), value: "full" },
+      { label: "Start now only" + dim("  — background until shutdown, no PC-start hook"), value: "now" },
+      { label: "Off" + dim("  — I'll run `aion telegram` manually"), value: "off" },
+    ];
+    if (cfg.telegram.autostart) autoOpts.unshift({ label: ok("Keep current") + dim(`  (autostart ${running ? "on · listener running" : "on"})`), value: "keep" });
+    const auto = await select(rl, `  Telegram listener autostart? ${dim("(currently: " + (cfg.telegram.autostart ? "on" : "off") + (running ? " · running, pid " + running : "") + ")")}`, autoOpts);
+    if (auto.value === "full") {
+      cfg.telegram.autostart = true;
+      try { await installAutostart(); } catch (e) { console.log(`  ${warn("⚠")} autostart task failed: ${e.message}`); }
+      const r = startListenerBackground();
+      console.log(`  ${ok("✔")} listener ${r.already ? "already running" : "started"} in the background ${dim("(pid " + r.pid + " · log: ~/.aion/telegram.log)")}`);
+    } else if (auto.value === "now") {
+      const r = startListenerBackground();
+      console.log(`  ${ok("✔")} listener ${r.already ? "already running" : "started"} in the background ${dim("(pid " + r.pid + ")")}`);
+    } else if (auto.value === "off") {
+      cfg.telegram.autostart = false;
+      await uninstallAutostart().catch(() => {});
+      console.log(`  ${ok("✔")} autostart off ${dim("— run manually with: aion telegram")}`);
+    }
   }
 
   cfg.setupComplete = true;

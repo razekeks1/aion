@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.8.0
+- Telegram listener is now a managed background service: setup offers **Always-on** (starts hidden now + at every PC start), single-instance guard via pid file, `aion telegram start|stop|status`
+- Launching `aion` revives the listener automatically if autostart is on and it died
+- `/telegram` in the TUI shows live listener status (pid, autostart) and supports `/telegram start|stop`
+- Disconnecting Telegram in setup also stops the listener and removes the autostart task
+
 ## 3.7.0
 - **Telegram**: `aion telegram setup` links a bot (token + identity verification via message), `aion telegram` runs the long-polling listener with the full agent (tools, memory, typing indicator, 4096-char chunking, stranger lockout), `aion telegram install` autostarts it hidden at every Windows logon (Task Scheduler + VBS; systemd instructions elsewhere)
 - **Setup v2**: re-running `aion setup` shows every current setting — Enter keeps it; keep/reconfigure/remove choices for Ollama, providers (removable now), main model, router and Telegram; feature tour no longer replays on re-runs

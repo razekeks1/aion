@@ -4,7 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { AION_HOME, saveConfig } from "./config.mjs";
 import { runTurn } from "./agent.mjs";
@@ -12,6 +12,47 @@ import { Memory } from "./memory.mjs";
 import { violet, aqua, ok, warn, err, dim, bold, ask, askHidden, Spinner } from "./ui.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const PID_FILE = path.join(AION_HOME, "telegram.pid");
+const LOG_FILE = path.join(AION_HOME, "telegram.log");
+const BIN_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "bin", "aion.mjs");
+
+// ── background lifecycle ─────────────────────────────────
+// PID of a live listener, or null. Never matches the calling process.
+export function listenerPid() {
+  try {
+    const pid = parseInt(fs.readFileSync(PID_FILE, "utf8"), 10);
+    if (pid && pid !== process.pid) {
+      process.kill(pid, 0); // throws if the process is gone
+      return pid;
+    }
+  } catch {}
+  return null;
+}
+
+// Detached, hidden, logs to ~/.aion/telegram.log. Returns the pid (or the
+// already-running one). Survives the parent exiting.
+export function startListenerBackground() {
+  const running = listenerPid();
+  if (running) return { pid: running, already: true };
+  fs.mkdirSync(AION_HOME, { recursive: true });
+  const out = fs.openSync(LOG_FILE, "a");
+  const child = spawn(process.execPath, [BIN_PATH, "telegram"], {
+    detached: true,
+    stdio: ["ignore", out, out],
+    windowsHide: true,
+  });
+  child.unref();
+  fs.closeSync(out);
+  return { pid: child.pid, already: false };
+}
+
+export function stopListener() {
+  const pid = listenerPid();
+  if (!pid) return false;
+  try { process.kill(pid); } catch { return false; }
+  try { fs.unlinkSync(PID_FILE); } catch {}
+  return true;
+}
 
 export async function tgApi(token, method, params = {}, timeoutMs = 30000) {
   const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
@@ -107,10 +148,22 @@ export async function runTelegramDaemon(cfg) {
     console.error(`Telegram is not configured. Run: ${aqua("aion telegram setup")}`);
     process.exit(1);
   }
+  const other = listenerPid();
+  if (other) {
+    console.error(`Listener already running (pid ${other}). Stop it with: aion telegram stop`);
+    process.exit(1);
+  }
+  fs.mkdirSync(AION_HOME, { recursive: true });
+  fs.writeFileSync(PID_FILE, String(process.pid), "utf8");
+  const cleanup = () => { try { if (parseInt(fs.readFileSync(PID_FILE, "utf8"), 10) === process.pid) fs.unlinkSync(PID_FILE); } catch {} };
+  process.on("exit", cleanup);
+  process.on("SIGINT", () => { cleanup(); process.exit(0); });
+  process.on("SIGTERM", () => { cleanup(); process.exit(0); });
+
   const memory = new Memory();
   const history = [];
   let offset = 0;
-  console.log(`\n  ${violet("◆")} ${bold("AION Telegram listener")} ${dim("— bot @" + (t.botName || "?") + " · locked to user " + t.userId)}`);
+  console.log(`\n  ${violet("◆")} ${bold("AION Telegram listener")} ${dim("— bot @" + (t.botName || "?") + " · locked to user " + t.userId + " · pid " + process.pid)}`);
   console.log(dim("  long-polling · Ctrl+C to stop\n"));
 
   let failures = 0;

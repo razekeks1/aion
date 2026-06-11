@@ -158,6 +158,18 @@ check("similarity low for unrelated", similarity("Pizza Rezept", "Quantenphysik 
   check("splitChunks loses nothing", chunks.join("").replace(/\s+/g, "").length === long.replace(/\s+/g, "").length);
   check("splitChunks short text = 1 chunk", splitChunks("hi").length === 1);
   check("splitChunks prefers paragraph breaks", splitChunks("a".repeat(3000) + "\n\n" + "b".repeat(3000), 4000)[0].endsWith("a"));
+
+  // pid-file lifecycle (sandboxed AION_HOME)
+  const { listenerPid, stopListener } = await import("../src/telegram.mjs");
+  const pidFile = path.join(process.env.AION_HOME, "telegram.pid");
+  fs.mkdirSync(process.env.AION_HOME, { recursive: true });
+  check("listenerPid null without pidfile", listenerPid() === null);
+  fs.writeFileSync(pidFile, "999999999", "utf8");
+  check("listenerPid null for dead pid", listenerPid() === null);
+  fs.writeFileSync(pidFile, String(process.ppid), "utf8");
+  check("listenerPid finds live process", listenerPid() === process.ppid);
+  fs.unlinkSync(pidFile);
+  check("stopListener no-op when idle", stopListener() === false);
 }
 
 // ── /loop interval parsing ──

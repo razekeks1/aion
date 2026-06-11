@@ -1039,19 +1039,31 @@ export class App {
 
       case "telegram": {
         const t = this.cfg.telegram;
-        sys(t?.userId
-          ? [
-              `${violet("◆")} Telegram ${ok("connected")} — bot ${aqua("@" + (t.botName || "?"))} → ${t.username ? "@" + t.username : "user " + t.userId}`,
-              dim("  listener:   aion telegram          (run in a separate terminal)"),
-              dim("  autostart:  aion telegram install  (starts hidden at every logon)"),
-              dim("  reconfigure: aion telegram setup · or /setup → Telegram step"),
-            ].join("\n")
-          : [
-              `${violet("◆")} Telegram ${dim("not connected")} — chat with Aion from your phone:`,
-              dim("  1. @BotFather → /newbot → copy the token"),
-              dim("  2. run: aion telegram setup   (or /setup → Telegram step)"),
-              dim("  3. run: aion telegram         · autostart: aion telegram install"),
-            ].join("\n"));
+        const { listenerPid, startListenerBackground, stopListener } = await import("./telegram.mjs");
+        if (arg === "start") {
+          if (!t?.token) { sys(err("✖ not configured — /setup → Telegram step")); break; }
+          const r = startListenerBackground();
+          sys(`${ok("✔")} listener ${r.already ? "already running" : "started in background"} ${dim("(pid " + r.pid + ")")}`);
+          break;
+        }
+        if (arg === "stop") {
+          sys(stopListener() ? `${ok("✔")} listener stopped` : dim("no listener running"));
+          break;
+        }
+        if (!t?.userId) {
+          sys([
+            `${violet("◆")} Telegram ${dim("not connected")} — chat with Aion from your phone:`,
+            dim("  1. @BotFather → /newbot → copy the token"),
+            dim("  2. run /setup → Telegram step (or: aion telegram setup)"),
+          ].join("\n"));
+          break;
+        }
+        const pid = listenerPid();
+        sys([
+          `${violet("◆")} Telegram ${ok("connected")} — bot ${aqua("@" + (t.botName || "?"))} → ${t.username ? "@" + t.username : "user " + t.userId}`,
+          `${violet("◆")} listener ${pid ? ok("running") + dim(" (pid " + pid + ")") : warn("not running")} · autostart at PC start ${t.autostart ? ok("on") : dim("off")}`,
+          dim("  /telegram start · /telegram stop · /setup → Telegram step toggles autostart"),
+        ].join("\n"));
         break;
       }
 

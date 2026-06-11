@@ -9,7 +9,7 @@
 [![license MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078d4)](#)
 [![CI](https://img.shields.io/badge/CI-3%20OS%20%C3%97%203%20node-brightgreen?logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
-[![tests](https://img.shields.io/badge/tests-111%20passing-brightgreen)](test/)
+[![tests](https://img.shields.io/badge/tests-115%20passing-brightgreen)](test/)
 
 *Hermes delivers messages. OpenClaw follows orders.*
 ***Aion is eternity itself — the agent that doesn't just grow with you, it evolves.***
@@ -79,7 +79,7 @@ Simple turns route to your fast/local model, hard ones to the flagship — autom
 ```
 
 ### 📱 Telegram — your agent in your pocket
-Link a bot once (`aion telegram setup` — token from @BotFather, then AION verifies it's really *you* by waiting for your message). From then on, `aion telegram` listens via long-polling: full agent with tools, memory and your machine — from your phone. Locked to your user ID; strangers get rejected. `aion telegram install` registers a hidden autostart task so the listener runs whenever your PC is on.
+Link a bot once (`aion telegram setup` — token from @BotFather, then AION verifies it's really *you* by waiting for your message). From then on the listener runs as a **managed background service**: pick *Always-on* in setup and it starts hidden immediately **and** at every PC start; launching `aion` revives it if it ever died. Full agent with tools, memory and your machine — from your phone, locked to your user ID. Control it anytime: `aion telegram start|stop|status` or `/telegram` in the TUI.
 
 ### ↻ Sessions that survive
 Every conversation auto-saves. `aion --continue` resumes exactly where you left off, `/sessions` opens a picker to jump back into any past conversation — even one-shot `aion -p` calls are resumable. `/export` writes the chat as clean Markdown.
@@ -187,7 +187,7 @@ Everything is local. Nothing leaves your machine except the LLM calls you config
 ## Development
 
 ```cmd
-npm test        # 111 smoke + TUI-hardening tests, sandboxed (never touches your ~/.aion)
+npm test        # 115 smoke + TUI-hardening tests, sandboxed (never touches your ~/.aion)
                 # CI runs them on Windows, Ubuntu and macOS × node 18/20/22
 ```
 

@@ -29,7 +29,8 @@ export async function main(argv) {
       "  aion --continue   resume your last conversation",
       "  aion setup        re-run the setup wizard (keeps current settings)",
       '  aion -p "..."     one-shot prompt (prints answer, exits)',
-      "  aion telegram     listen for Telegram messages (setup|install|uninstall)",
+      "  aion telegram     listen for Telegram messages",
+      "                    (setup|start|stop|status|install|uninstall)",
       "  aion --version    print version",
       "",
       "  data lives in " + dim(process.platform === "win32" ? "%USERPROFILE%\\.aion" : "~/.aion"),
@@ -46,7 +47,8 @@ export async function main(argv) {
   }
 
   if (argv[0] === "telegram") {
-    const { runTelegramDaemon, runTelegramSetup, installAutostart, uninstallAutostart } = await import("./telegram.mjs");
+    const { runTelegramDaemon, runTelegramSetup, installAutostart, uninstallAutostart,
+      startListenerBackground, stopListener, listenerPid } = await import("./telegram.mjs");
     const sub = argv[1];
     if (sub === "setup") {
       const rl = createInterface();
@@ -56,6 +58,21 @@ export async function main(argv) {
     }
     if (sub === "install") { await installAutostart(); return; }
     if (sub === "uninstall") { await uninstallAutostart(); return; }
+    if (sub === "start") {
+      if (!cfg.telegram?.token) { console.error("Not configured — run: aion telegram setup"); process.exit(1); }
+      const r = startListenerBackground();
+      console.log(`${r.already ? "already running" : "started in background"} (pid ${r.pid}) — log: ~/.aion/telegram.log`);
+      return;
+    }
+    if (sub === "stop") {
+      console.log(stopListener() ? "listener stopped" : "no listener running");
+      return;
+    }
+    if (sub === "status") {
+      const pid = listenerPid();
+      console.log(pid ? `running (pid ${pid})` : "not running");
+      return;
+    }
     if (!cfg.telegram?.token) {
       // first run: configure inline, then start listening
       const rl = createInterface();
@@ -100,6 +117,17 @@ export async function main(argv) {
     rl.close();
     if (!cfg.setupComplete) return;
     // fall through into the REPL with a fresh stdin
+  }
+
+  // keep the Telegram listener alive: if autostart is on and it died, revive it
+  if (cfg.telegram?.autostart && cfg.telegram?.token) {
+    try {
+      const { listenerPid, startListenerBackground } = await import("./telegram.mjs");
+      if (!listenerPid()) {
+        const r = startListenerBackground();
+        console.log(dim(`  📱 telegram listener started in background (pid ${r.pid})`));
+      }
+    } catch {}
   }
 
   // resume the previous conversation: aion --continue / -c

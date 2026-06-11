@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.10.0
+- New direct providers: **MiniMax**, **DeepSeek**, **Moonshot (Kimi)**; OpenAI catalog gains the Codex coding model
+- Fix: council seat model refs now accept every registered provider (list was hardcoded)
+- Windows autostart switched from Task Scheduler to HKCU Run key — **no admin rights needed**, verified end-to-end
+- Proper macOS autostart via launchd LaunchAgent and Linux via systemd user unit (was: printed instructions only)
+- Headless `aion telegram` without config now exits cleanly instead of hanging in an interactive prompt (autostart safety)
+- install.sh: clear hint when global npm install needs sudo
+
 ## 3.9.0
 - One-command installers: `install.ps1` (Windows — installs Node LTS via winget if missing, downloads without git) and `install.sh` (macOS/Linux — brew/apt fallback)
 

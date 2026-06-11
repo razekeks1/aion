@@ -42,6 +42,7 @@ export const PROVIDERS = {
     keyUrl: "https://platform.openai.com/api-keys",
     catalog: [
       { id: "gpt-5.2", hint: "flagship" },
+      { id: "gpt-5.1-codex", hint: "coding agent (Codex)" },
       { id: "gpt-5.2-mini", hint: "fast" },
       { id: "gpt-4.1", hint: "previous gen" },
     ],
@@ -97,6 +98,36 @@ export const PROVIDERS = {
     catalog: [
       { id: "mistral-large-latest", hint: "flagship" },
       { id: "mistral-small-latest", hint: "fast" },
+    ],
+  },
+  minimax: {
+    label: "MiniMax",
+    kind: "openai",
+    base: "https://api.minimax.io/v1",
+    keyUrl: "https://platform.minimax.io/user-center/basic-information/interface-key",
+    catalog: [
+      { id: "MiniMax-M2", hint: "open flagship, agentic" },
+      { id: "MiniMax-Text-01", hint: "long context" },
+    ],
+  },
+  deepseek: {
+    label: "DeepSeek",
+    kind: "openai",
+    base: "https://api.deepseek.com/v1",
+    keyUrl: "https://platform.deepseek.com/api_keys",
+    catalog: [
+      { id: "deepseek-chat", hint: "V3 — cheap frontier" },
+      { id: "deepseek-reasoner", hint: "R1 — deep reasoning" },
+    ],
+  },
+  moonshot: {
+    label: "Moonshot (Kimi)",
+    kind: "openai",
+    base: "https://api.moonshot.ai/v1",
+    keyUrl: "https://platform.moonshot.ai/console/api-keys",
+    catalog: [
+      { id: "kimi-latest", hint: "newest Kimi" },
+      { id: "kimi-k2-0905-preview", hint: "K2 — 1T MoE" },
     ],
   },
 };
@@ -241,7 +272,7 @@ async function chatOpenAI(cfg, def, providerName, { model, messages, tools, onTo
     Authorization: `Bearer ${apiKey}`,
   };
   if (providerName === "openrouter") {
-    headers["HTTP-Referer"] = "https://github.com/aion-agent";
+    headers["HTTP-Referer"] = "https://github.com/razekeks1/aion";
     headers["X-Title"] = "AION";
   }
   const res = await fetch(`${def.base}/chat/completions`, {

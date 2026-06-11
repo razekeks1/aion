@@ -9,7 +9,7 @@
 [![license MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078d4)](#)
 [![CI](https://img.shields.io/badge/CI-3%20OS%20%C3%97%203%20node-brightgreen?logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
-[![tests](https://img.shields.io/badge/tests-115%20passing-brightgreen)](test/)
+[![tests](https://img.shields.io/badge/tests-119%20passing-brightgreen)](test/)
 
 *Hermes delivers messages. OpenClaw follows orders.*
 ***Aion is eternity itself — the agent that doesn't just grow with you, it evolves.***
@@ -43,7 +43,7 @@ aion
 ```
 
 That's the whole install. **Zero npm dependencies** — pure Node.js ≥ 18, no build step, no compiler.
-First launch runs a setup wizard: connect **Ollama** (local or Ollama Cloud), optionally add Anthropic, OpenAI, Google, OpenRouter, Groq, xAI or Mistral, pick your models, optionally link **Telegram** — done. A short animated feature tour shows you around. Re-run `aion setup` anytime: it shows every current setting and Enter keeps it.
+First launch runs a setup wizard: connect **Ollama** (local or Ollama Cloud), optionally add Anthropic, OpenAI (incl. Codex), Google, OpenRouter, Groq, xAI, Mistral, MiniMax, DeepSeek or Moonshot/Kimi, pick your models, optionally link **Telegram** — done. A short animated feature tour shows you around. Re-run `aion setup` anytime: it shows every current setting and Enter keeps it.
 
 ---
 
@@ -124,7 +124,8 @@ Aion writes, saves and reuses its own skills as it works. Successful multi-tool 
  ┌──────────────────────────────────┐  │ memory ·│               └──────────────────┘
  │  Providers: Ollama (local/cloud) │  │ skills  │
  │  Anthropic·OpenAI·Google·Groq·   │  └─────────┘
- │  OpenRouter·xAI·Mistral          │
+ │  OpenRouter·xAI·Mistral·MiniMax· │
+ │  DeepSeek·Moonshot               │
  └──────────────────────────────────┘
 ```
 
@@ -199,7 +200,7 @@ Everything is local. Nothing leaves your machine except the LLM calls you config
 ## Development
 
 ```cmd
-npm test        # 115 smoke + TUI-hardening tests, sandboxed (never touches your ~/.aion)
+npm test        # 119 smoke + TUI-hardening tests, sandboxed (never touches your ~/.aion)
                 # CI runs them on Windows, Ubuntu and macOS × node 18/20/22
 ```
 

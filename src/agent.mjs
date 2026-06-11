@@ -1,7 +1,7 @@
 // AION agent core — Aegis resilience, neural router, council deliberation,
 // parallel tool execution, living system prompt with evolved genome.
 import os from "node:os";
-import { chat } from "./providers.mjs";
+import { chat, PROVIDERS } from "./providers.mjs";
 import { toolDefinitions, executeTool, loadSkills } from "./tools.mjs";
 
 const MAX_TOOL_ROUNDS = 12;
@@ -184,7 +184,7 @@ function parseModelRef(m, cfg) {
   if (typeof m === "object") return m.id ? m : null;
   const s = String(m);
   const i = s.indexOf(":");
-  if (i > 0 && ["ollama", "anthropic", "openai", "google", "openrouter", "groq", "xai", "mistral"].includes(s.slice(0, i))) {
+  if (i > 0 && Object.keys(PROVIDERS).includes(s.slice(0, i))) {
     return { provider: s.slice(0, i), id: s.slice(i + 1) };
   }
   return { provider: cfg.model.provider || "ollama", id: s };

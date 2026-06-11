@@ -148,6 +148,22 @@ check("similarity low for unrelated", similarity("Pizza Rezept", "Quantenphysik 
   check("ctx fallback when host down", n === 128000);
 }
 
+// ── provider registry sanity ──
+{
+  const { PROVIDERS } = await import("../src/providers.mjs");
+  const keys = Object.keys(PROVIDERS);
+  check("≥11 providers registered", keys.length >= 11);
+  check("minimax/deepseek/moonshot present", ["minimax", "deepseek", "moonshot"].every((k) => keys.includes(k)));
+  const openaiKind = keys.filter((k) => PROVIDERS[k].kind === "openai");
+  check("openai-kind providers well-formed", openaiKind.every((k) => PROVIDERS[k].base?.startsWith("https://") && PROVIDERS[k].catalog?.length));
+  // new providers must be usable in council seat strings (regression: hardcoded list)
+  const seats = councilSeats({
+    model: { provider: "ollama", id: "x" }, providers: {},
+    council: { seats: [{ role: "S", model: "minimax:MiniMax-M2" }, { role: "T", model: "deepseek:deepseek-chat" }] },
+  });
+  check("council parses new provider refs", seats[0].model.provider === "minimax" && seats[1].model.provider === "deepseek");
+}
+
 // ── telegram: chunking + module surface ──
 {
   const { splitChunks, runTelegramDaemon, runTelegramSetup, installAutostart } = await import("../src/telegram.mjs");

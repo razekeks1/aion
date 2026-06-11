@@ -30,7 +30,10 @@ echo "  downloading AION..."
 rm -rf "$DEST"; mkdir -p "$DEST"
 curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/heads/main" | tar -xz -C "$DEST" --strip-components=1
 echo "  installing global 'aion' command..."
-(cd "$DEST" && npm install -g . >/dev/null)
+(cd "$DEST" && npm install -g . >/dev/null) || {
+  echo "  npm -g failed (permissions?). Try:  sudo npm install -g \"$DEST\""
+  exit 1
+}
 
 echo ""
 echo "  [ok] done. Start with:  aion"

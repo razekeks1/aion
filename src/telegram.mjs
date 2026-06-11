@@ -219,32 +219,92 @@ export async function runTelegramDaemon(cfg) {
 }
 
 // ── autostart while the PC runs ──────────────────────────
+// Windows: Task Scheduler (hidden via VBS) · macOS: launchd LaunchAgent ·
+// Linux: systemd user unit. All per-user, no admin/root needed.
 const TASK_NAME = "AION Telegram Listener";
+const PLIST_PATH = path.join(os.homedir(), "Library", "LaunchAgents", "com.aion.telegram.plist");
+const UNIT_DIR = path.join(os.homedir(), ".config", "systemd", "user");
+const UNIT_PATH = path.join(UNIT_DIR, "aion-telegram.service");
+
+const run = (cmd, args) => new Promise((resolve, reject) => {
+  execFile(cmd, args, { windowsHide: true }, (e, so, se) => (e ? reject(new Error((se || e.message).trim())) : resolve(so)));
+});
 
 export async function installAutostart() {
-  if (process.platform !== "win32") {
-    console.log(`Create a user service, e.g. systemd:\n\n[Unit]\nDescription=AION Telegram\n[Service]\nExecStart=${process.execPath} ${path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "bin", "aion.mjs")} telegram\nRestart=always\n[Install]\nWantedBy=default.target\n`);
+  if (process.platform === "darwin") {
+    fs.mkdirSync(path.dirname(PLIST_PATH), { recursive: true });
+    fs.writeFileSync(PLIST_PATH, `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.aion.telegram</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${process.execPath}</string>
+    <string>${BIN_PATH}</string>
+    <string>telegram</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>${LOG_FILE}</string>
+  <key>StandardErrorPath</key><string>${LOG_FILE}</string>
+</dict>
+</plist>
+`, "utf8");
+    await run("launchctl", ["unload", PLIST_PATH]).catch(() => {});
+    await run("launchctl", ["load", "-w", PLIST_PATH]);
+    console.log(`${ok("✔")} autostart installed — LaunchAgent com.aion.telegram starts at every login`);
+    console.log(dim(`  log: ${LOG_FILE} · remove: aion telegram uninstall`));
     return;
   }
-  // hidden launcher (VBS) so no console window pops up at logon
-  const binPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "bin", "aion.mjs");
-  const logPath = path.join(AION_HOME, "telegram.log");
+  if (process.platform === "linux") {
+    fs.mkdirSync(UNIT_DIR, { recursive: true });
+    fs.writeFileSync(UNIT_PATH, `[Unit]
+Description=AION Telegram listener
+
+[Service]
+ExecStart=${process.execPath} ${BIN_PATH} telegram
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+`, "utf8");
+    try {
+      await run("systemctl", ["--user", "daemon-reload"]);
+      await run("systemctl", ["--user", "enable", "--now", "aion-telegram.service"]);
+      console.log(`${ok("✔")} autostart installed — systemd user service aion-telegram is enabled and running`);
+    } catch (e) {
+      console.log(`${warn("⚠")} unit written to ${UNIT_PATH}, but systemctl failed (${e.message.slice(0, 80)})`);
+      console.log(dim("  enable manually: systemctl --user enable --now aion-telegram.service"));
+    }
+    return;
+  }
+  // Windows: HKCU Run key + hidden VBS launcher — works for every user,
+  // no admin rights needed (schtasks ONLOGON would require elevation)
   const vbsPath = path.join(AION_HOME, "telegram-autostart.vbs");
-  const cmd = `""${process.execPath}" "${binPath}" telegram >> "${logPath}" 2>&1"`;
+  const cmd = `""${process.execPath}" "${BIN_PATH}" telegram >> "${LOG_FILE}" 2>&1"`;
   fs.writeFileSync(vbsPath, `CreateObject("Wscript.Shell").Run "cmd /c ${cmd.replace(/"/g, '""')}", 0, False\r\n`, "utf8");
-  await new Promise((resolve, reject) => {
-    execFile("schtasks.exe", ["/Create", "/F", "/TN", TASK_NAME, "/SC", "ONLOGON", "/TR", `wscript.exe "${vbsPath}"`],
-      { windowsHide: true }, (e, so, se) => (e ? reject(new Error(se || e.message)) : resolve()));
-  });
+  await run("reg.exe", ["add", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+    "/v", "AION-Telegram", "/t", "REG_SZ", "/d", `wscript.exe "${vbsPath}"`, "/f"]);
   console.log(`${ok("✔")} autostart installed — Telegram listener starts hidden at every logon`);
-  console.log(dim(`  task: "${TASK_NAME}" · log: ${logPath} · start now: aion telegram · remove: aion telegram uninstall`));
+  console.log(dim(`  log: ${LOG_FILE} · start now: aion telegram · remove: aion telegram uninstall`));
 }
 
 export async function uninstallAutostart() {
-  if (process.platform !== "win32") { console.log("Remove your systemd unit manually."); return; }
-  await new Promise((resolve) => {
-    execFile("schtasks.exe", ["/Delete", "/F", "/TN", TASK_NAME], { windowsHide: true }, () => resolve());
-  });
+  if (process.platform === "darwin") {
+    await run("launchctl", ["unload", PLIST_PATH]).catch(() => {});
+    try { fs.unlinkSync(PLIST_PATH); } catch {}
+    console.log(`${ok("✔")} autostart removed`);
+    return;
+  }
+  if (process.platform === "linux") {
+    await run("systemctl", ["--user", "disable", "--now", "aion-telegram.service"]).catch(() => {});
+    try { fs.unlinkSync(UNIT_PATH); } catch {}
+    console.log(`${ok("✔")} autostart removed`);
+    return;
+  }
+  await run("reg.exe", ["delete", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "AION-Telegram", "/f"]).catch(() => {});
+  await run("schtasks.exe", ["/Delete", "/F", "/TN", TASK_NAME]).catch(() => {}); // legacy cleanup
   try { fs.unlinkSync(path.join(AION_HOME, "telegram-autostart.vbs")); } catch {}
   console.log(`${ok("✔")} autostart removed`);
 }

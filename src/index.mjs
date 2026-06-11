@@ -74,6 +74,11 @@ export async function main(argv) {
       return;
     }
     if (!cfg.telegram?.token) {
+      // headless (autostart/service) must never hang in an interactive prompt
+      if (!process.stdin.isTTY) {
+        console.error("Telegram not configured — run: aion telegram setup");
+        process.exit(1);
+      }
       // first run: configure inline, then start listening
       const rl = createInterface();
       cfg = await runTelegramSetup(cfg, rl);

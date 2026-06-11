@@ -1,10 +1,10 @@
 # AION one-command installer for Windows
-#   irm https://raw.githubusercontent.com/aion-agent/aion/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/razekeks1/aion/main/install.ps1 | iex
 # Installs Node.js LTS if missing (winget), downloads AION, installs the
 # global `aion` command. No git required. No admin required (winget may ask).
 
 $ErrorActionPreference = "Stop"
-$Repo = "aion-agent/aion"   # ← GitHub repo (owner/name)
+$Repo = "razekeks1/aion"   # ← GitHub repo (owner/name)
 
 Write-Host ""
 Write-Host "  AION installer" -ForegroundColor Magenta

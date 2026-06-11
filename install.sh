@@ -1,8 +1,8 @@
 #!/bin/sh
 # AION one-command installer for macOS / Linux
-#   curl -fsSL https://raw.githubusercontent.com/aion-agent/aion/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/razekeks1/aion/main/install.sh | sh
 set -e
-REPO="aion-agent/aion"
+REPO="razekeks1/aion"
 
 echo ""
 echo "  AION installer"

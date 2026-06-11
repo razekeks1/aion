@@ -22,12 +22,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aion-agent/aion.git"
+    "url": "git+https://github.com/razekeks1/aion.git"
   },
   "bugs": {
-    "url": "https://github.com/aion-agent/aion/issues"
+    "url": "https://github.com/razekeks1/aion/issues"
   },
-  "homepage": "https://github.com/aion-agent/aion#readme",
+  "homepage": "https://github.com/razekeks1/aion#readme",
   "keywords": [
     "ai",
     "agent",

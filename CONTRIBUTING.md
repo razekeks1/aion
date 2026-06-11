@@ -9,7 +9,7 @@ Thanks for wanting to make the eternal agent better. A few ground rules keep it 
 ## Getting started
 
 ```cmd
-git clone https://github.com/aion-agent/aion && cd aion
+git clone https://github.com/razekeks1/aion && cd aion
 npm install -g .        # link the `aion` command to your checkout
 npm test                # smoke + TUI-hardening suites (sandboxed via AION_HOME)
 ```

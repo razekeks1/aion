@@ -25,16 +25,16 @@
 **Windows** (PowerShell — installs Node.js automatically if missing):
 
 ```powershell
-irm https://raw.githubusercontent.com/aion-agent/aion/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/razekeks1/aion/main/install.ps1 | iex
 ```
 
 **macOS / Linux**:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/aion-agent/aion/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/razekeks1/aion/main/install.sh | sh
 ```
 
-Or the classic way: `git clone https://github.com/aion-agent/aion && cd aion && npm install -g .`
+Or the classic way: `git clone https://github.com/razekeks1/aion && cd aion && npm install -g .`
 
 Then, from **any** terminal:
 

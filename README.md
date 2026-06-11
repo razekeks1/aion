@@ -50,11 +50,11 @@ First launch runs a setup wizard: connect **Ollama** (local or Ollama Cloud), op
 ## Why this isn't just another chat CLI
 
 ### 🧬 Evolution Engine
-Aion reads your reactions — *"perfekt!"*, *"nein, falsch"* — as feedback signals. During dream cycles it **rewrites its own behavioral genome**: rules injected into every future system prompt, each with a confidence score that grows as rules survive successive dreams.
+Aion reads your reactions — *"perfect, thanks!"*, *"no, that's wrong"* (English, German and more) — as feedback signals. During dream cycles it **rewrites its own behavioral genome**: rules injected into every future system prompt, each with a confidence score that grows as rules survive successive dreams.
 
 ```text
 ❯ /genome
- 1 ████░  78% Always answer in German unless asked otherwise 📌
+ 1 ████░  78% Always include runnable commands, not just prose 📌
  2 ███░░  65% Prefer PowerShell over cmd in examples
  3 ██░░░  50% Keep answers under 10 lines for quick questions
 ```
@@ -130,16 +130,18 @@ Aion writes, saves and reuses its own skills as it works. Successful multi-tool 
 
 ## vs. the field
 
-| | Hermes Agent | OpenClaw | **AION** |
-|---|---|---|---|
-| Memory | flat curated notes | session files | **triadic** — episodic + semantic + procedural, importance-scored, time-decayed |
-| Consolidation | — | — | **Dream Cycle** 💤 — episodes→facts, dedup, prune |
-| Self-improvement | — | — | **Evolution Engine** 🧬 — genome rewritten from your feedback, confidence-scored, pinnable |
-| Multi-model | one model | one model | **Council** 🏛 — parallel deliberation + synthesis, **Router** — auto fast/smart lane |
-| Failure handling | error → dead turn | error → dead turn | **Aegis** ⚡ — retry, backoff, mid-turn failover |
-| Skills | install from hub | plugins | **self-forging** + auto-learned procedures |
-| Recall | embeddings (needs model) | grep | hybrid trigram+keyword — offline, multilingual, instant |
-| Dependencies | dozens | dozens | **zero** |
+How AION compares to typical terminal agents (Hermes Agent, OpenClaw and friends):
+
+| | most agent CLIs | **AION** |
+|---|---|---|
+| Memory | notes or session files | **triadic** — episodic + semantic + procedural, importance-scored, time-decayed |
+| Consolidation | — | **Dream Cycle** 💤 — episodes→facts, dedup, prune |
+| Self-improvement | — | **Evolution Engine** 🧬 — genome rewritten from your feedback, confidence-scored, pinnable |
+| Multi-model | usually one model per chat | **Council** 🏛 — parallel deliberation + synthesis · **Router** — auto fast/smart lane |
+| Failure handling | error surfaces to you | **Aegis** ⚡ — retry, backoff, mid-turn failover |
+| Skills | installed from a hub / plugins | **self-forging** + auto-learned procedures |
+| Recall | embeddings (needs a model) or grep | hybrid trigram+keyword — offline, multilingual, instant |
+| Dependencies | dozens of packages | **zero** |
 
 ## The TUI
 
@@ -155,9 +157,9 @@ Aion writes, saves and reuses its own skills as it works. Successful multi-tool 
 ## Daily use
 
 ```text
-❯ merk dir: mein Server heißt atlas und läuft auf Port 8443
+❯ remember this: my server is called atlas and runs on port 8443
   ⚙ remember {"fact":"User's server is named atlas, runs on port 8443"...}
-✔ Gemerkt.
+✔ Noted — I'll remember that.
 
 ❯ /council should I shard this database now or later?
 ❯ /goal clean up my Downloads folder, sorted by file type

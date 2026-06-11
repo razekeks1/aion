@@ -52,7 +52,7 @@ app.render = () => {}; // never draw
 const offlineCommands = [
   "/help", "/genome", "/genome pin 99", "/genome reset", "/memory", "/facts",
   "/remember smoketest-tui fact", "/forget smoketest-tui", "/skills",
-  "/persona", "/stats", "/export " + path.join(os.tmpdir(), "aion-test-export.md"),
+  "/persona", "/stats", "/telegram", "/export " + path.join(os.tmpdir(), "aion-test-export.md"),
   "/unknowncommand", "/clear",
 ];
 

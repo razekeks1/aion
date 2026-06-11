@@ -27,8 +27,9 @@ export async function main(argv) {
       "",
       "  aion              start interactive session (runs setup on first launch)",
       "  aion --continue   resume your last conversation",
-      "  aion setup        re-run the setup wizard",
+      "  aion setup        re-run the setup wizard (keeps current settings)",
       '  aion -p "..."     one-shot prompt (prints answer, exits)',
+      "  aion telegram     listen for Telegram messages (setup|install|uninstall)",
       "  aion --version    print version",
       "",
       "  data lives in " + dim(process.platform === "win32" ? "%USERPROFILE%\\.aion" : "~/.aion"),
@@ -41,6 +42,28 @@ export async function main(argv) {
     const rl = createInterface();
     cfg = await runSetup(cfg, rl);
     rl.close();
+    return;
+  }
+
+  if (argv[0] === "telegram") {
+    const { runTelegramDaemon, runTelegramSetup, installAutostart, uninstallAutostart } = await import("./telegram.mjs");
+    const sub = argv[1];
+    if (sub === "setup") {
+      const rl = createInterface();
+      await runTelegramSetup(cfg, rl);
+      rl.close();
+      return;
+    }
+    if (sub === "install") { await installAutostart(); return; }
+    if (sub === "uninstall") { await uninstallAutostart(); return; }
+    if (!cfg.telegram?.token) {
+      // first run: configure inline, then start listening
+      const rl = createInterface();
+      cfg = await runTelegramSetup(cfg, rl);
+      rl.close();
+      if (!cfg.telegram?.token) return;
+    }
+    await runTelegramDaemon(cfg);
     return;
   }
 

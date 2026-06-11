@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.7.0
+- **Telegram**: `aion telegram setup` links a bot (token + identity verification via message), `aion telegram` runs the long-polling listener with the full agent (tools, memory, typing indicator, 4096-char chunking, stranger lockout), `aion telegram install` autostarts it hidden at every Windows logon (Task Scheduler + VBS; systemd instructions elsewhere)
+- **Setup v2**: re-running `aion setup` shows every current setting — Enter keeps it; keep/reconfigure/remove choices for Ollama, providers (removable now), main model, router and Telegram; feature tour no longer replays on re-runs
+- `/telegram` in the TUI shows connection status and instructions
+
 ## 3.6.0
 - Live context gauge in the status bar (`⛁ 12.4k/512k`): token estimate vs auto-detected model window (exact via Ollama `/api/show`, curated table for cloud models)
 - `/compact` — summarizes old history via the fast model, keeps the last 4 messages verbatim; auto-compacts at 85% context usage

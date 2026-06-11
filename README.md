@@ -33,7 +33,7 @@ aion
 ```
 
 That's the whole install. **Zero npm dependencies** — pure Node.js ≥ 18.
-First launch runs a setup wizard: connect **Ollama** (local or Ollama Cloud), optionally add Anthropic, OpenAI, Google, OpenRouter, Groq, xAI or Mistral, pick your models — done. A short animated feature tour shows you around.
+First launch runs a setup wizard: connect **Ollama** (local or Ollama Cloud), optionally add Anthropic, OpenAI, Google, OpenRouter, Groq, xAI or Mistral, pick your models, optionally link **Telegram** — done. A short animated feature tour shows you around. Re-run `aion setup` anytime: it shows every current setting and Enter keeps it.
 
 ---
 
@@ -77,6 +77,9 @@ Simple turns route to your fast/local model, hard ones to the flagship — autom
 ❯ /goal refactor utils.py, run the tests, fix everything until green
 🎯 goal set — working autonomously, max 15 iterations
 ```
+
+### 📱 Telegram — your agent in your pocket
+Link a bot once (`aion telegram setup` — token from @BotFather, then AION verifies it's really *you* by waiting for your message). From then on, `aion telegram` listens via long-polling: full agent with tools, memory and your machine — from your phone. Locked to your user ID; strangers get rejected. `aion telegram install` registers a hidden autostart task so the listener runs whenever your PC is on.
 
 ### ↻ Sessions that survive
 Every conversation auto-saves. `aion --continue` resumes exactly where you left off, `/sessions` opens a picker to jump back into any past conversation — even one-shot `aion -p` calls are resumable. `/export` writes the chat as clean Markdown.
@@ -184,7 +187,7 @@ Everything is local. Nothing leaves your machine except the LLM calls you config
 ## Development
 
 ```cmd
-npm test        # 105 smoke + TUI-hardening tests, sandboxed (never touches your ~/.aion)
+npm test        # 111 smoke + TUI-hardening tests, sandboxed (never touches your ~/.aion)
                 # CI runs them on Windows, Ubuntu and macOS × node 18/20/22
 ```
 

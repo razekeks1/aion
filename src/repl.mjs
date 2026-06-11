@@ -62,7 +62,8 @@ const PALETTE = [
   ["skills", "list forged skills", false],
   ["persona", "reshape Aion's persona", true],
   ["stats", "session statistics", false],
-  ["setup", "run the setup wizard", false],
+  ["setup", "re-run setup (keeps current settings)", false],
+  ["telegram", "phone access status & how to connect", false],
   ["clear", "clear conversation", false],
   ["reset", "wipe all memory", false],
   ["help", "show help", false],
@@ -1033,6 +1034,24 @@ export class App {
         this._wrap.clear();
         this.refreshCtx();
         sys(`${ok("✔")} setup done · model ${aqua(this.cfg.model.id)}`);
+        break;
+      }
+
+      case "telegram": {
+        const t = this.cfg.telegram;
+        sys(t?.userId
+          ? [
+              `${violet("◆")} Telegram ${ok("connected")} — bot ${aqua("@" + (t.botName || "?"))} → ${t.username ? "@" + t.username : "user " + t.userId}`,
+              dim("  listener:   aion telegram          (run in a separate terminal)"),
+              dim("  autostart:  aion telegram install  (starts hidden at every logon)"),
+              dim("  reconfigure: aion telegram setup · or /setup → Telegram step"),
+            ].join("\n")
+          : [
+              `${violet("◆")} Telegram ${dim("not connected")} — chat with Aion from your phone:`,
+              dim("  1. @BotFather → /newbot → copy the token"),
+              dim("  2. run: aion telegram setup   (or /setup → Telegram step)"),
+              dim("  3. run: aion telegram         · autostart: aion telegram install"),
+            ].join("\n"));
         break;
       }
 

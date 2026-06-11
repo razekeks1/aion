@@ -148,6 +148,18 @@ check("similarity low for unrelated", similarity("Pizza Rezept", "Quantenphysik 
   check("ctx fallback when host down", n === 128000);
 }
 
+// ── telegram: chunking + module surface ──
+{
+  const { splitChunks, runTelegramDaemon, runTelegramSetup, installAutostart } = await import("../src/telegram.mjs");
+  check("telegram exports complete", [runTelegramDaemon, runTelegramSetup, installAutostart].every((f) => typeof f === "function"));
+  const long = ("Absatz eins.\n\n" + "x".repeat(3000) + "\n\n" + "y".repeat(3000)).repeat(2);
+  const chunks = splitChunks(long, 4000);
+  check("splitChunks respects 4000 limit", chunks.every((c) => c.length <= 4000));
+  check("splitChunks loses nothing", chunks.join("").replace(/\s+/g, "").length === long.replace(/\s+/g, "").length);
+  check("splitChunks short text = 1 chunk", splitChunks("hi").length === 1);
+  check("splitChunks prefers paragraph breaks", splitChunks("a".repeat(3000) + "\n\n" + "b".repeat(3000), 4000)[0].endsWith("a"));
+}
+
 // ── /loop interval parsing ──
 check("parseInterval 5m", parseInterval("5m") === 300000);
 check("parseInterval 90s", parseInterval("90s") === 90000);

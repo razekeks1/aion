@@ -338,6 +338,10 @@ function toOllamaMessages(messages) {
         })),
       };
     }
+    // vision: Ollama takes a base64 images array alongside the text content
+    if (m.images?.length) {
+      return { role: m.role, content: String(m.content || ""), images: m.images.map((i) => i.b64) };
+    }
     return { role: m.role, content: m.content };
   });
 }
@@ -357,6 +361,16 @@ function toOpenAIMessages(messages) {
           type: "function",
           function: { name: tc.name, arguments: JSON.stringify(tc.arguments ?? {}) },
         })),
+      };
+    }
+    // vision: OpenAI-compatible APIs take multimodal content parts
+    if (m.images?.length) {
+      return {
+        role: m.role,
+        content: [
+          { type: "text", text: String(m.content || "") },
+          ...m.images.map((i) => ({ type: "image_url", image_url: { url: `data:${i.mime};base64,${i.b64}` } })),
+        ],
       };
     }
     return { role: m.role, content: m.content };

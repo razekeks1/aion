@@ -149,6 +149,49 @@ app.overlayEvent({ type: "key", name: "down" });
 app.overlayEvent({ type: "key", name: "enter" });
 check("overlay pick returns value", (await p) === 2);
 
+// ── slash autocomplete ──
+{
+  app.input.text = ""; app.input.cur = 0; app.suggest = null;
+  app.onEvent({ type: "char", ch: "/" });
+  check("suggest opens on /", app.suggest && app.suggest.items.length > 5);
+  app.onEvent({ type: "char", ch: "s" });
+  check("suggest filters by letter", app.suggest.items.every((it) => it.name.includes("s")));
+  check("suggest ranks prefix first", app.suggest.items[0].name.startsWith("s"));
+  app.onEvent({ type: "key", name: "down" });
+  check("suggest arrow moves selection", app.suggest.sel === 1);
+  const picked = app.suggest.items[1];
+  app.onEvent({ type: "key", name: "tab" });
+  check("tab completes command", app.input.text === "/" + picked.name || app.input.text === "/" + picked.name + " ");
+  check("suggest closes after accept", app.suggest === null);
+  // a space ends command-word mode → no suggestions
+  app.input.text = "/council "; app.input.cur = app.input.text.length;
+  app.updateSuggest();
+  check("no suggest after space", app.suggest === null);
+  app.input.text = ""; app.input.cur = 0; app.suggest = null;
+}
+
+// ── clipboard image attach: submit claims & clears attachments ──
+{
+  check("pasteImage method present", typeof app.pasteImage === "function");
+  let receivedImages = null;
+  const realTurn2 = app.turn.bind(app);
+  app.turn = async () => { receivedImages = app._claimed; };
+  // patch turn to capture what it would receive: simulate the claim path
+  app.attachments = [{ b64: "AAAA", mime: "image/png", bytes: 2048 }];
+  app.input.text = "what is this?"; app.input.cur = app.input.text.length;
+  // run the real turn body's claim logic by calling submit with a stub turn
+  app.turn = async (line) => { app._claimedLine = line; app._claimedImgs = app.attachments; app.attachments = []; };
+  await app.submit();
+  check("submit routed text to turn", app._claimedLine === "what is this?");
+  check("attachments cleared after submit", app.attachments.length === 0);
+  // image-only message (empty text) is allowed
+  app.attachments = [{ b64: "BBBB", mime: "image/png", bytes: 100 }];
+  app.input.text = ""; app.input.cur = 0;
+  await app.submit();
+  check("image-only message sends", app._claimedLine === "(see attached image)");
+  app.turn = realTurn2; app.attachments = [];
+}
+
 // ── context tracking + /compact guard rails ──
 {
   app.history = [

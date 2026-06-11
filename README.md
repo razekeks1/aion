@@ -9,7 +9,7 @@
 [![license MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-0078d4)](#)
 [![CI](https://img.shields.io/badge/CI-3%20OS%20%C3%97%203%20node-brightgreen?logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
-[![tests](https://img.shields.io/badge/tests-119%20passing-brightgreen)](test/)
+[![tests](https://img.shields.io/badge/tests-130%20passing-brightgreen)](test/)
 
 *Hermes delivers messages. OpenClaw follows orders.*
 ***Aion is eternity itself — the agent that doesn't just grow with you, it evolves.***
@@ -93,6 +93,9 @@ Link a bot once (`aion telegram setup` — token from @BotFather, then AION veri
 
 ### ↻ Sessions that survive
 Every conversation auto-saves. `aion --continue` resumes exactly where you left off, `/sessions` opens a picker to jump back into any past conversation — even one-shot `aion -p` calls are resumable. `/export` writes the chat as clean Markdown.
+
+### ⌨️ A terminal that feels modern
+Type `/` and a **live autocomplete** filters every command as you go — prefix matches first, `↑↓` to pick, `Tab` to complete. Press **`Ctrl+V`** to paste a **screenshot straight from your clipboard** into the chat; it's sent to any vision-capable model (works on Windows, macOS and Linux). Plus streaming markdown, mouse, multiline input and a live context gauge.
 
 ### ⚒ Self-forging skills
 Aion writes, saves and reuses its own skills as it works. Successful multi-tool workflows are auto-learned as procedures — no command needed.
@@ -200,7 +203,7 @@ Everything is local. Nothing leaves your machine except the LLM calls you config
 ## Development
 
 ```cmd
-npm test        # 119 smoke + TUI-hardening tests, sandboxed (never touches your ~/.aion)
+npm test        # 130 smoke + TUI-hardening tests, sandboxed (never touches your ~/.aion)
                 # CI runs them on Windows, Ubuntu and macOS × node 18/20/22
 ```
 

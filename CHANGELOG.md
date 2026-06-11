@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.11.0
+- **Slash autocomplete**: typing `/` opens a live-filtered command list that ranks prefix matches first; `↑↓` to pick, `Tab` to complete, `↵` to run, `Esc` to dismiss
+- **Clipboard images**: `Ctrl+V` pastes a screenshot straight into the chat (Windows/macOS/Linux); images are sent to vision-capable models (OpenAI-compatible multimodal parts + Ollama images array). Image-only messages (no text) are allowed
+
 ## 3.10.0
 - New direct providers: **MiniMax**, **DeepSeek**, **Moonshot (Kimi)**; OpenAI catalog gains the Codex coding model
 - Fix: council seat model refs now accept every registered provider (list was hardcoded)

@@ -120,15 +120,18 @@ export function buildSystemPrompt(cfg, memory, userText) {
 }
 
 // ── Main turn: agent loop, parallel tools, Aegis ─────────
-export async function runTurn(cfg, memory, history, userText, onEvent, signal) {
+export async function runTurn(cfg, memory, history, userText, onEvent, signal, images = null) {
   let model = routeModel(cfg, userText, history);
   onEvent?.({ type: "route", model });
 
   const system = buildSystemPrompt(cfg, memory, userText);
+  const userMsg = images?.length
+    ? { role: "user", content: userText, images }
+    : { role: "user", content: userText };
   const messages = [
     { role: "system", content: system },
     ...history,
-    { role: "user", content: userText },
+    userMsg,
   ];
   const tools = toolDefinitions();
   let finalContent = "";

@@ -10,6 +10,7 @@ import { saveConfig } from "./config.mjs";
 import { runSetup, collectModels } from "./setup.mjs";
 import { PROVIDERS, quickChat, modelContextWindow } from "./providers.mjs";
 import { newSessionId, saveSession, exportMarkdown, listSessions } from "./sessions.mjs";
+import { grabClipboardImage } from "./clipboard.mjs";
 import path from "node:path";
 import fs from "node:fs";
 import {
@@ -127,6 +128,8 @@ export class App {
     this.autoLoop = null;   // {prompt, intervalMs|null (self-paced), runs, nextAt}
     this._ctxSize = null;   // detected model context window (tokens)
     this._est = null;       // cached context-usage estimate
+    this.attachments = [];  // pending clipboard images for the next message
+    this.suggest = null;    // {items, sel} live slash-command autocomplete
     this.refreshCtx();
     this.sessionId = resume?.id || newSessionId();
     if (resume?.history?.length) {
@@ -346,8 +349,8 @@ export class App {
     if (this.quitting) return;
     if (this.overlay) return this.overlayEvent(ev);
 
-    if (ev.type === "char") return this.insert(ev.ch);
-    if (ev.type === "paste") return this.insert(ev.text); // multiline paste stays multiline
+    if (ev.type === "char") { this.insert(ev.ch); return this.updateSuggest(); }
+    if (ev.type === "paste") { this.insert(ev.text); return this.updateSuggest(); } // multiline paste stays multiline
 
     if (ev.type === "mouse") {
       if (ev.kind === "wheel-up") { this.scroll += 3; this.dirty = true; return; }
@@ -358,6 +361,18 @@ export class App {
 
     if (ev.type !== "key") return;
     const I = this.input;
+
+    // ── live slash-command autocomplete navigation ──
+    if (this.suggest) {
+      if (ev.name === "up") { this.suggest.sel = (this.suggest.sel - 1 + this.suggest.items.length) % this.suggest.items.length; this.dirty = true; return; }
+      if (ev.name === "down") { this.suggest.sel = (this.suggest.sel + 1) % this.suggest.items.length; this.dirty = true; return; }
+      if (ev.name === "tab") return this.acceptSuggest(false);
+      if (ev.name === "enter") return this.acceptSuggest(true);
+      if (ev.name === "esc") { this.suggest = null; this.dirty = true; return; }
+    } else if (ev.name === "ctrl-v") {
+      return this.pasteImage();
+    }
+
     switch (ev.name) {
       case "enter":
         // trailing backslash continues on the next line (claude-code idiom)
@@ -369,15 +384,15 @@ export class App {
       case "ctrl-p": return this.openPalette();
       case "backspace":
         if (I.cur > 0) { const p = cpPrev(I.text, I.cur); I.text = I.text.slice(0, p) + I.text.slice(I.cur); I.cur = p; this.dirty = true; }
-        return;
+        return this.updateSuggest();
       case "delete":
         if (I.cur < I.text.length) { I.text = I.text.slice(0, I.cur) + I.text.slice(cpNext(I.text, I.cur)); this.dirty = true; }
-        return;
+        return this.updateSuggest();
       case "left": I.cur = ev.ctrl ? this.wordLeft() : cpPrev(I.text, I.cur); this.dirty = true; return;
       case "right": I.cur = ev.ctrl ? this.wordRight() : cpNext(I.text, I.cur); this.dirty = true; return;
       case "home": I.cur = I.text.lastIndexOf("\n", I.cur - 1) + 1; this.dirty = true; return;
       case "end": { const nl = I.text.indexOf("\n", I.cur); I.cur = nl === -1 ? I.text.length : nl; this.dirty = true; return; }
-      case "ctrl-u": I.text = ""; I.cur = 0; this.dirty = true; return;
+      case "ctrl-u": I.text = ""; I.cur = 0; this.dirty = true; return this.updateSuggest();
       case "ctrl-w": {
         const left = this.wordLeft();
         I.text = I.text.slice(0, left) + I.text.slice(I.cur);
@@ -407,6 +422,59 @@ export class App {
     I.cur += s.length;
     I.hi = -1;
     this.dirty = true;
+  }
+
+  // ── live slash-command autocomplete ────────────────────
+  updateSuggest() {
+    if (this.capture) { this.suggest = null; return; }
+    const I = this.input;
+    const m = /^\/([a-z0-9]*)$/i.exec(I.text); // only while typing the command word
+    if (!m || I.cur !== I.text.length) { if (this.suggest) { this.suggest = null; this.dirty = true; } return; }
+    const q = m[1].toLowerCase();
+    const ranked = PALETTE
+      .map(([name, hint, needsArg]) => {
+        const n = name.toLowerCase();
+        let score = -1;
+        if (!q) score = 0;
+        else if (n === q) score = 3;
+        else if (n.startsWith(q)) score = 2;
+        else if (n.includes(q)) score = 1;
+        return { name, hint, needsArg, score };
+      })
+      .filter((x) => x.score >= 0)
+      .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+    this.suggest = ranked.length ? { items: ranked, sel: 0 } : null;
+    this.dirty = true;
+  }
+
+  acceptSuggest(submitIfComplete) {
+    const it = this.suggest?.items[this.suggest.sel];
+    if (!it) return;
+    this.suggest = null;
+    if (it.needsArg) {
+      this.input.text = "/" + it.name + " ";
+      this.input.cur = this.input.text.length;
+      this.dirty = true;
+    } else if (submitIfComplete) {
+      this.input.text = "/" + it.name;
+      this.input.cur = this.input.text.length;
+      this.submit();
+    } else {
+      this.input.text = "/" + it.name;
+      this.input.cur = this.input.text.length;
+      this.dirty = true;
+    }
+  }
+
+  // ── clipboard image paste ──────────────────────────────
+  async pasteImage() {
+    if (this.busy) return;
+    this.status = "reading clipboard"; this.dirty = true;
+    const img = await grabClipboardImage();
+    this.status = "";
+    if (!img) { this.add("sys", dim("📋 no image on the clipboard")); return; }
+    this.attachments.push(img);
+    this.add("sys", `${ok("📎")} image attached ${dim(`(${Math.round(img.bytes / 1024)} KB · ${this.attachments.length} pending · sent with your next message)`)}`);
   }
 
   wordLeft() {
@@ -553,16 +621,21 @@ export class App {
       r(line || null);
       return;
     }
-    if (!line || this.busy) return;
-    this.input.hist.push(line);
+    this.suggest = null;
+    // a message with only an attached image and no text is valid
+    if ((!line && !this.attachments.length) || this.busy) return;
+    if (line) this.input.hist.push(line);
     this.input.text = ""; this.input.cur = 0; this.input.hi = -1;
     this.scroll = 0;
     if (line.startsWith("/")) await this.command(line);
-    else await this.turn(line);
+    else await this.turn(line || "(see attached image)");
   }
 
   // ── chat turn ──────────────────────────────────────────
   async turn(line, display = null) {
+    // claim any pending clipboard images for this turn
+    const images = this.attachments;
+    this.attachments = [];
     // implicit feedback about the previous answer feeds the Evolution Engine
     const fb = detectFeedback(line);
     if (fb && this.history.length >= 2) {
@@ -570,7 +643,7 @@ export class App {
       this.memory.recordFeedback(fb, `assistant: ${String(lastA.content).slice(0, 140)} | user: ${line.slice(0, 90)}`);
     }
 
-    this.add("user", display || line);
+    this.add("user", (display || line) + (images.length ? "  " + dim(`📎 ${images.length} image${images.length > 1 ? "s" : ""}`) : ""));
     this.busy = true;
     this.status = "thinking";
     this.abort = new AbortController();
@@ -624,7 +697,7 @@ export class App {
           this.status = "thinking";
         }
         this.dirty = true;
-      }, this.abort.signal);
+      }, this.abort.signal, images.length ? images : null);
 
       if (content?.trim()) {
         sm.text = renderMarkdown(content);
@@ -747,6 +820,7 @@ export class App {
           "**Sessions** — auto-saved · `/sessions` browse & resume · `aion --continue` · `/export` → Markdown",
           "**Scroll** — mouse wheel · `PgUp`/`PgDn` · `Esc` jump to bottom",
           "**Input** — `↑↓` history/lines · `Ctrl+J` or `\\`+`↵` newline · `Ctrl+←→` word jump · `Ctrl+U` clear · click to place cursor",
+          "**Slash** — type `/` to autocomplete commands (`↑↓` pick · `Tab` complete · `↵` run) · **`Ctrl+V`** pastes a clipboard image",
           "**Models** — `/model` picker (or click the model name below) · `/models` · `/router`",
           "**Memory** — `/memory` explains the brain · `/facts` · `/remember` · `/forget` · `/dream`",
           "**Context** — live gauge `⛁ used/window` in the status bar · `/compact` summarizes old history · auto-compacts at 85%",
@@ -1231,9 +1305,33 @@ export class App {
     for (let r = 1; r <= rows; r++) {
       buf += `\x1b[${r};1H\x1b[2K` + padTrunc(S[r] || "", cols);
     }
+    if (this.suggest && !this.overlay) buf += this.renderSuggest(cols, rows);
     if (this.overlay) buf += this.renderOverlay(cols, rows);
     buf += "\x1b[?2026l";
     this.term.write(buf);
+  }
+
+  // floating autocomplete list, anchored just above the input row
+  renderSuggest(cols, rows) {
+    const items = this.suggest.items.slice(0, 8);
+    const baseY = (this._inputPos?.y || rows - 2);
+    const longest = Math.max(...items.map((it) => it.name.length + (it.hint?.length || 0)));
+    const w = Math.min(cols - 4, Math.max(28, longest + 8));
+    const x = 2;
+    let buf = "";
+    const top = baseY - items.length - 1;
+    if (top < 1) return ""; // not enough room — silently skip
+    buf += `\x1b[${top};${x}H` + violet("╭" + "─".repeat(w - 2) + "╮");
+    items.forEach((it, i) => {
+      const sel = i === this.suggest.sel;
+      const left = "/" + it.name;
+      const text = sel
+        ? "\x1b[48;5;55m\x1b[97m " + padTrunc(left + "  " + (it.hint || ""), w - 3) + RESET
+        : " " + aqua(left) + "  " + padTrunc(dim(it.hint || ""), Math.max(0, w - 3 - left.length - 2));
+      buf += `\x1b[${top + 1 + i};${x}H` + violet("│") + text + violet("│");
+    });
+    buf += `\x1b[${top + 1 + items.length};${x}H` + violet("╰" + "─".repeat(w - 2) + "╯");
+    return buf;
   }
 
   renderEmpty(S, cols, rows) {

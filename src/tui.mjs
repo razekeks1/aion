@@ -131,6 +131,7 @@ export class Term {
       else if (ch === "\x17") out.push({ type: "key", name: "ctrl-w" });
       else if (ch === "\x0c") out.push({ type: "key", name: "ctrl-l" });
       else if (ch === "\x10") out.push({ type: "key", name: "ctrl-p" });
+      else if (ch === "\x16") out.push({ type: "key", name: "ctrl-v" });
       else if (ch === "\x01") out.push({ type: "key", name: "home" });
       else if (ch === "\x05") out.push({ type: "key", name: "end" });
       else if (ch >= " ") out.push({ type: "char", ch });

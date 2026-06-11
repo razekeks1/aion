@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.9.0
+- One-command installers: `install.ps1` (Windows — installs Node LTS via winget if missing, downloads without git) and `install.sh` (macOS/Linux — brew/apt fallback)
+
 ## 3.8.0
 - Telegram listener is now a managed background service: setup offers **Always-on** (starts hidden now + at every PC start), single-instance guard via pid file, `aion telegram start|stop|status`
 - Launching `aion` revives the listener automatically if autostart is on and it died

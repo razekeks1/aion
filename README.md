@@ -22,9 +22,19 @@
 
 ## Install
 
-```cmd
-git clone https://github.com/aion-agent/aion && cd aion && npm install -g .
+**Windows** (PowerShell — installs Node.js automatically if missing):
+
+```powershell
+irm https://raw.githubusercontent.com/aion-agent/aion/main/install.ps1 | iex
 ```
+
+**macOS / Linux**:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/aion-agent/aion/main/install.sh | sh
+```
+
+Or the classic way: `git clone https://github.com/aion-agent/aion && cd aion && npm install -g .`
 
 Then, from **any** terminal:
 
@@ -32,7 +42,7 @@ Then, from **any** terminal:
 aion
 ```
 
-That's the whole install. **Zero npm dependencies** — pure Node.js ≥ 18.
+That's the whole install. **Zero npm dependencies** — pure Node.js ≥ 18, no build step, no compiler.
 First launch runs a setup wizard: connect **Ollama** (local or Ollama Cloud), optionally add Anthropic, OpenAI, Google, OpenRouter, Groq, xAI or Mistral, pick your models, optionally link **Telegram** — done. A short animated feature tour shows you around. Re-run `aion setup` anytime: it shows every current setting and Enter keeps it.
 
 ---
